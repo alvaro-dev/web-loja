@@ -615,10 +615,15 @@ app.patch('/api/crud-caixas/:id', async (req, res) => {
 // 📟 ROTA ATUALIZADA: Acompanhamento de Caixas com Separação de Dinheiro e Eletrônico
 app.get('/api/acompanhamento-caixas', async (req, res) => {
     const { x_empresa_id, x_filial_id } = req.headers;
+    const { dataFiltro } = req.query; // 🌟 Captura o dia enviado pelo Vue (Formato YYYY-MM-DD)
 
     if (!x_empresa_id || !x_filial_id) {
         return res.status(400).json({ erro: 'Empresa e Filial ativas precisam ser especificadas nos cabeçalhos.' });
     }
+
+    // Monta os limites estritos de início e fim daquele dia
+    const inicioDia = `${dataFiltro} 00:00:00`;
+    const fimDia = `${dataFiltro} 23:59:59`;
 
     try {
         const query = `
@@ -633,7 +638,6 @@ app.get('/api/acompanhamento-caixas', async (req, res) => {
                 COALESCE(mc.valor_fechamento, 0) AS valor_fechamento,
                 COALESCE(u_ab.nome, 'Nenhum') AS operador_abertura,
                 COALESCE(u_fc.nome, 'Nenhum') AS operador_fechamento,
-                -- 💵 Soma apenas as movimentações em Dinheiro do turno
                 COALESCE((
                     SELECT SUM(CASE WHEN v.origem = 'E' THEN v.total ELSE -v.total END)
                     FROM vendas v 
@@ -643,7 +647,6 @@ app.get('/api/acompanhamento-caixas', async (req, res) => {
                       AND v.forma_pagamento = 'DN'
                       AND v.deletado = false
                 ), 0) AS dinheiro_turno,
-                -- 💳 Soma o faturamento eletrônico puro (Entradas de CC, CD e Pix)
                 COALESCE((
                     SELECT SUM(v.total) 
                     FROM vendas v 
@@ -655,7 +658,11 @@ app.get('/api/acompanhamento-caixas', async (req, res) => {
                       AND v.deletado = false
                 ), 0) AS eletronico_turno
             FROM caixas c
-            LEFT JOIN movimentos_caixa mc ON mc.caixa_id = c.id AND mc.deletado = false
+            -- 🌟 TRAVA DIÁRIA: O LEFT JOIN agora só se vincula a turnos criados no dia do filtro
+            LEFT JOIN movimentos_caixa mc ON mc.caixa_id = c.id 
+                                         AND mc.data_abertura >= $3::timestamp 
+                                         AND mc.data_abertura <= $4::timestamp
+                                         AND mc.deletado = false
             LEFT JOIN usuarios u_ab ON u_ab.id = mc.operador_abertura_id
             LEFT JOIN usuarios u_fc ON u_fc.id = mc.operador_fechamento_id
             WHERE c.empresa_id = $1 
@@ -664,10 +671,10 @@ app.get('/api/acompanhamento-caixas', async (req, res) => {
             ORDER BY mc.status ASC, mc.data_abertura DESC, c.descricao ASC;
         `;
 
-        const resultado = await pool.query(query, [x_empresa_id, x_filial_id]);
+        const resultado = await pool.query(query, [x_empresa_id, x_filial_id, inicioDia, fimDia]);
         return res.json(resultado.rows);
     } catch (err) {
-        console.error('Erro no acompanhamento de caixas:', err);
+        console.error('Erro no acompanhamento de caixas com filtro:', err);
         return res.status(500).json({ erro: 'Erro interno ao processar o painel de caixas.' });
     }
 });
@@ -712,60 +719,70 @@ app.put('/api/tabelas-escopo/:tabela_nome', async (req, res) => {
 // 💳 ROTA CORRIGIDA: Relatório Gerencial de Recebíveis de Cartão (Multi-Tenant)
 app.get('/api/relatorio-recebiveis', async (req, res) => {
     const { x_empresa_id, x_filial_id } = req.headers;
+    const { dataInicio, dataFim } = req.query; // 🌟 Captura os limites temporais enviados pelo Vue
 
     if (!x_empresa_id || !x_filial_id) {
-        return res.status(400).json({ erro: 'Cabeçalhos de escopo (Tenant) obrigatórios.' });
+        return res.status(400).json({ erro: 'Faltam dados estruturais de cabeçalho.' });
     }
 
+    // Configura os limites estritos de início e fim da consulta para o timezone timestamp
+    const dataInicioClean = `${dataInicio} 00:00:00`;
+    const dataFimClean = `${dataFim} 23:59:59`;
+
     try {
-        // Query 1: Consolidação de Saldos por Bandeira (Gráfico / Resumo)
+        // 1. QUERY DOS CARDS SUPERIORES: Consolida os totais por bandeira dentro do período
         const queryResumo = `
             SELECT 
                 v.bandeira,
-                COALESCE(SUM(CASE WHEN rc.status = 'P' THEN rc.valor_parcela ELSE 0 END), 0) AS total_a_receber,
-                COALESCE(SUM(CASE WHEN rc.status = 'R' THEN rc.valor_parcela ELSE 0 END), 0) AS total_recebido,
-                COUNT(rc.id) AS total_parcelas
+                COUNT(rc.id) AS total_parcelas,
+                SUM(CASE WHEN rc.status = 'R' THEN rc.valor_parcela ELSE 0 END) AS total_recebido,
+                SUM(CASE WHEN rc.status = 'P' THEN rc.valor_parcela ELSE 0 END) AS total_a_receber
             FROM recebiveis_cartao rc
-            JOIN vendas v ON v.id = rc.venda_id
+            JOIN vendas v ON v.id = rc.venda_id AND v.deletado = false
             WHERE rc.empresa_id = $1 
-              AND rc.filial_id = $2 
+              AND rc.filial_id = $2
+              AND rc.data_prevista_recebimento >= $3::timestamp
+              AND rc.data_prevista_recebimento <= $4::timestamp
               AND rc.deletado = false
             GROUP BY v.bandeira
-            ORDER BY total_a_receber DESC;
+            ORDER BY total_a_receber DESC, v.bandeira ASC;
         `;
 
-        // Query 2: Extrato Analítico (Listagem detalhada das parcelas futuras)
-        const queryDetalhe = `
+        // 2. QUERY DA AGENDA FUTURA: Lista as linhas detalhadas dentro do período
+        const queryExtrato = `
             SELECT 
                 rc.id,
+                rc.data_prevista_recebimento,
                 v.bandeira,
                 rc.parcela_numero,
                 v.parcelas AS total_parcelas_venda,
+                cx.descricao AS caixa_nome,
                 rc.valor_parcela,
-                rc.data_prevista_recebimento,
-                rc.status,
-                c.descricao AS caixa_nome
+                rc.status
             FROM recebiveis_cartao rc
-            JOIN vendas v ON v.id = rc.venda_id
-            JOIN caixas c ON c.id = rc.caixa_id
+            JOIN vendas v ON v.id = rc.venda_id AND v.deletado = false
+            JOIN caixas cx ON cx.id = rc.caixa_id
             WHERE rc.empresa_id = $1 
-              AND rc.filial_id = $2 
+              AND rc.filial_id = $2
+              AND rc.data_prevista_recebimento >= $3::timestamp
+              AND rc.data_prevista_recebimento <= $4::timestamp
               AND rc.deletado = false
-            ORDER BY rc.data_prevista_recebimento ASC
-            LIMIT 200;
+            ORDER BY rc.data_prevista_recebimento ASC, v.bandeira ASC;
         `;
 
-        const resumo = await pool.query(queryResumo, [x_empresa_id, x_filial_id]);
-        const detalhe = await pool.query(queryDetalhe, [x_empresa_id, x_filial_id]);
+        const [resumoBanco, extratoBanco] = await Promise.all([
+            pool.query(queryResumo, [x_empresa_id, x_filial_id, dataInicioClean, dataFimClean]),
+            pool.query(queryExtrato, [x_empresa_id, x_filial_id, dataInicioClean, dataFimClean])
+        ]);
 
-        // 🌟 CORREÇÃO AQUI: Atribuição limpa para as propriedades do objeto
         return res.json({
-            resumoBandeiras: resumo.rows,
-            extratoParcelas: detalhe.rows
+            resumoBandeiras: resumoBanco.rows,
+            extratoParcelas: extratoBanco.rows
         });
+
     } catch (err) {
-        console.error('Erro ao gerar relatório de recebíveis:', err);
-        return res.status(500).json({ erro: 'Erro interno ao processar recebíveis.' });
+        console.error('Erro na conciliação por período:', err);
+        return res.status(500).json({ erro: 'Erro interno ao processar o balanço de cartões.' });
     }
 });
 

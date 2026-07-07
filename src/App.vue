@@ -436,14 +436,25 @@
 
             <!-- 📟 MÓDULO GERENCIAL: ACOMPANHAMENTO DE CAIXAS EM TEMPO REAL -->
             <div v-else-if="abaAtiva === '/acompanhamento-caixas'" class="w-full text-left space-y-6 animate-fade-in">
-              <div class="flex justify-between items-center bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50">
+              <div class="flex flex-wrap items-center gap-4 bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 justify-between">
                 <div>
                   <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-indigo-400"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" /></svg>
+                    <!-- Ícone original mantido -->
                     Monitoramento de Terminais (PDV)
                   </h3>
-                  <p class="text-xs text-slate-400 mt-0.5">Visão macro de movimentações financeiras. Clique em um card para detalhar as vendas daquele turno abaixo.</p>
+                  <p class="text-xs text-slate-400 mt-0.5">Visão macro de movimentações financeiras por dia de abertura.</p>
                 </div>
+                
+                <!-- 📅 NOVO INPUT DE FILTRO DIÁRIO -->
+                <div class="flex items-center gap-3 bg-slate-900/50 border border-slate-700 rounded-xl px-3 py-1.5">
+                  <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtrar Dia:</label>
+                  <input 
+                    type="date" 
+                    v-model="filtroDataAcompanhamento" 
+                    class="bg-transparent text-white text-sm outline-none cursor-pointer scheme:dark"
+                  />
+                </div>
+
                 <button @click="carregarAcompanhamentoCaixas" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors cursor-pointer">
                   Atualizar Dados
                 </button>
@@ -561,17 +572,31 @@
             <!-- 💳 MÓDULO FINANCEIRO: RELATÓRIO DE RECEBÍVEIS DE CARTÃO (CC) -->
             <div v-else-if="abaAtiva === '/recebiveis-cc'" class="w-full text-left space-y-6 animate-fade-in">
               
-              <div class="flex justify-between items-center bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50">
-                <div>
+              <div class="flex flex-wrap justify-between items-center bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 gap-4">
+                <div class="min-w-fit">
                   <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-indigo-400"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>
+                    <!-- Ícone original mantido -->
                     Painel de Recebíveis de Cartão de Crédito
                   </h3>
-                  <p class="text-xs text-slate-400 mt-0.5">Clique em um card de bandeira para isolar os lançamentos ou clique novamente para exibir todos.</p>
+                  <p class="text-xs text-slate-400 mt-0.5">Mapeamento e agenda futura de faturamento eletrônico.</p>
                 </div>
+                
+                <!-- 📅 INPUTS DE FILTRO DE PERÍODO (DE / ATÉ) -->
+                <div class="flex items-center gap-4 bg-slate-900/40 border border-slate-700/80 rounded-xl px-4 py-2">
+                  <div class="flex items-center gap-2">
+                    <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Vencimento De:</label>
+                    <input type="date" v-model="filtroCcDataInicio" class="bg-transparent text-white text-xs outline-none cursor-pointer scheme:dark" />
+                  </div>
+                  <div class="w-px h-4 bg-slate-700"></div>
+                  <div class="flex items-center gap-2">
+                    <label class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Até:</label>
+                    <input type="date" v-model="filtroCcDataFim" class="bg-transparent text-white text-xs outline-none cursor-pointer scheme:dark" />
+                  </div>
+                </div>
+
                 <button 
                   @click="carregarRelatorioRecebiveis"
-                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors cursor-pointer"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm transition-colors cursor-pointer shrink-0 shadow-lg"
                 >
                   Sincronizar Relatório
                 </button>
@@ -1504,16 +1529,22 @@ async function alternarStatusCaixa(id, valor) {
 // 📟 ESTADOS E MÉTODOS DO MONITORAMENTO EM TEMPO REAL DE CAIXAS
 // ======================================================================
 const listaMonitoramentoCaixas = ref([]);
+// 📅 Campo reativo para filtrar o dia do acompanhamento de turnos (Padrão: Hoje)
+const filtroDataAcompanhamento = ref(new Date().toISOString().split('T')[0]);
 
 async function carregarAcompanhamentoCaixas() {
   if (!empresaAtivaId.value || !filialAtivaId.value) return;
 
   try {
-    const res = await fetch(`${API_URL}/api/acompanhamento-caixas`, {
+    // 🌟 Envia o dia escolhido para o backend isolar os turnos
+    const queryParams = new URLSearchParams({
+      dataFiltro: filtroDataAcompanhamento.value
+    });
+
+    const res = await fetch(`${API_URL}/api/acompanhamento-caixas?${queryParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        // 🌟 PASSAGEM DO TENANT NOS HEADERS DA REQUISIÇÃO
         'x_empresa_id': empresaAtivaId.value,
         'x_filial_id': filialAtivaId.value
       }
@@ -1528,12 +1559,11 @@ async function carregarAcompanhamentoCaixas() {
 }
 
 // 🔄 ASSISTENTE: Se o usuário mudar de filial no topo da tela, recarrega o painel automaticamente
-watch([empresaAtivaId, filialAtivaId, abaAtiva], () => {
+watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroDataAcompanhamento], () => {
   if (abaAtiva.value === '/acompanhamento-caixas') {
     carregarAcompanhamentoCaixas();
   }
 });
-
 
 // Variable e Estados para o Extrato Dinâmico do Acompanhamento de Caixas
 const turnoSelecionadoAcompanhamento = ref(null);
@@ -1601,8 +1631,6 @@ watch([abaAtiva, empresaAtivaId, filialAtivaId], () => {
   turnoSelecionadoAcompanhamento.value = null;
   extratoVendasTurnoAcompanhamento.value = [];
 });
-
-
 
 // ======================================================================
 // 🧠 ESTADOS E MÉTODOS DA GOVERNANÇA DE ESCOPO MULT-TENANT
@@ -1674,11 +1702,21 @@ function alternarFiltroBandeira(bandeira) {
   }
 }
 
+// 📅 Filtros de período para projeção de cartões (Padrão: Próximos 30 dias)
+const filtroCcDataInicio = ref(new Date().toISOString().split('T')[0]);
+const filtroCcDataFim = ref(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
 async function carregarRelatorioRecebiveis() {
   if (!empresaAtivaId.value || !filialAtivaId.value) return;
 
   try {
-    const res = await fetch(`${API_URL}/api/relatorio-recebiveis`, {
+    // 🌟 Adiciona o escopo de datas no parâmetro da rota
+    const queryParams = new URLSearchParams({
+      dataInicio: filtroCcDataInicio.value,
+      dataFim: filtroCcDataFim.value
+    });
+
+    const res = await fetch(`${API_URL}/api/relatorio-recebiveis?${queryParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -1689,7 +1727,7 @@ async function carregarRelatorioRecebiveis() {
 
     if (res.ok) {
       dadosRecebiveis.value = await res.json();
-      bandeiraSelecionadaFiltro.value = ''; // Garante que inicia exibindo a listagem cheia
+      bandeiraSelecionadaFiltro.value = ''; 
     }
   } catch (err) {
     console.error('Erro ao mapear relatório financeiro:', err);
@@ -1697,7 +1735,7 @@ async function carregarRelatorioRecebiveis() {
 }
 
 // Recarrega se trocar de aba, empresa ou filial
-watch([empresaAtivaId, filialAtivaId, abaAtiva], () => {
+watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroCcDataInicio, filtroCcDataFim], () => {
   if (abaAtiva.value === '/recebiveis-cc') {
     carregarRelatorioRecebiveis();
   }
