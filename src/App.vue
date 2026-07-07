@@ -690,6 +690,206 @@
 
             </div>
 
+            <!-- ====================================================================== -->
+            <!-- 👥 MÓDULO: CONTROLE DE CLIENTES                                       -->
+            <!-- ====================================================================== -->
+            <div v-else-if="abaAtiva === '/clientes'" class="space-y-6">
+
+              <!-- Cabeçalho e Ações Rápidas -->
+              <div class="flex flex-wrap justify-between items-center bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 gap-4">
+                <div>
+                  <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    Gestão de Clientes & Políticas de Crédito
+                  </h3>
+                  <p class="text-xs text-slate-400 mt-0.5">Controle de limites de crediário próprio, cadastros e inadimplência.</p>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                  <!-- Campo de Busca Dinâmica -->
+                  <input 
+                    type="text" 
+                    v-model="filtroBuscaCliente"
+                    placeholder="Buscar por Nome ou CPF..." 
+                    class="bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-2 text-sm outline-none w-64 focus:border-indigo-500 transition-colors"
+                  />
+                  <button 
+                    @click="resetarFormCliente(); exibindoModalCliente = true"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-lg"
+                  >
+                    Novo Cliente
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tabela Principal de Registros -->
+              <div class="bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-900/50 border-b border-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wider">
+                        <th class="p-4">Nome Completo</th>
+                        <th class="p-4">CPF</th>
+                        <th class="p-4">Contato / WhatsApp</th>
+                        <th class="p-4">Cidade/UF</th>
+                        <th class="p-4">Limite Crediário</th>
+                        <th class="p-4">Situação</th>
+                        <th class="p-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/40 text-slate-200 text-sm">
+                      <tr v-for="cl in listaClientes" :key="cl.id" class="hover:bg-slate-700/20 transition-colors">
+                        <td class="p-4 font-medium text-white">{{ cl.nome }}</td>
+                        <td class="p-4 font-mono text-xs text-slate-400">{{ cl.cpf || 'Não Informado' }}</td>
+                        <td class="p-4">{{ cl.telefone || '-' }}</td>
+                        <td class="p-4 text-slate-300">{{ cl.cidade ? `${cl.cidade}-${cl.estado}` : '-' }}</td>
+                        <td class="p-4 font-semibold text-indigo-400">R$ {{ parseFloat(cl.limite_credito).toFixed(2) }}</td>
+                        <td class="p-4">
+                          <span 
+                            :class="cl.bloqueado === 'S' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'"
+                            class="px-2.5 py-1 rounded-full text-xs font-bold uppercase border"
+                          >
+                            {{ cl.bloqueado === 'S' ? 'Bloqueado' : 'Regular' }}
+                          </span>
+                        </td>
+                        <td class="p-4 text-right space-x-2">
+                          <button @click="iniciarEdicaoCliente(cl)" class="text-indigo-400 hover:text-indigo-300 text-xs font-medium cursor-pointer">Editar</button>
+                          <button @click="excluirCliente(cl.id)" class="text-rose-400 hover:text-rose-300 text-xs font-medium cursor-pointer">Excluir</button>
+                        </td>
+                      </tr>
+                      <tr v-if="listaClientes.length === 0">
+                        <td colspan="7" class="p-8 text-center text-slate-500 text-xs uppercase font-mono">Nenhum cliente cadastrado ou localizado nesta busca.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 🔲 MODAL FORMULÁRIO DE CADASTRO/EDIÇÃO -->
+              <div v-if="exibindoModalCliente" class="fixed inset-0 bg-slate-950/80 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  
+                  <!-- Modal Header -->
+                  <div class="bg-slate-900 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                    <h4 class="text-md font-bold text-white uppercase tracking-wide">
+                      {{ editandoClienteId ? 'Atualizar Ficha do Cliente' : 'Cadastrar Novo Cliente' }}
+                    </h4>
+                    <button @click="exibindoModalCliente = false" class="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
+                  </div>
+
+                  <!-- Modal Body (Rolável) -->
+                  <div class="p-6 space-y-5 overflow-y-auto flex-1 text-slate-300 text-xs">
+                    
+                    <!-- SEÇÃO 1: Dados Principais -->
+                    <div>
+                      <h5 class="text-indigo-400 font-bold uppercase tracking-wider text-[10px] mb-3">1. Identificação Básica</h5>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1 md:col-span-2">
+                          <label class="font-semibold text-slate-400">Nome Completo *</label>
+                          <input type="text" v-model="formCliente.nome" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" placeholder="Nome social ou completo" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">CPF</label>
+                          <input type="text" v-model="formCliente.cpf" placeholder="000.000.000-00" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">RG</label>
+                          <input type="text" v-model="formCliente.rg" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">Data de Nascimento</label>
+                          <input type="date" v-model="formCliente.data_nascimento" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm [color-scheme:dark]" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">Telefone / WhatsApp</label>
+                          <input type="text" v-model="formCliente.telefone" placeholder="(00) 00000-0000" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1 md:col-span-2">
+                          <label class="font-semibold text-slate-400">E-mail</label>
+                          <input type="email" v-model="formCliente.email" placeholder="cliente@email.com" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- SEÇÃO 2: Endereço -->
+                    <div class="border-t border-slate-700/60 pt-4">
+                      <h5 class="text-indigo-400 font-bold uppercase tracking-wider text-[10px] mb-3">2. Endereço Residencial</h5>
+                      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="flex flex-col gap-1 col-span-2 md:col-span-1">
+                          <label class="font-semibold text-slate-400">CEP</label>
+                          <input type="text" v-model="formCliente.cep" @blur="buscarCep" placeholder="00000-000" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1 col-span-2 md:col-span-3">
+                          <label class="font-semibold text-slate-400">Logradouro / Rua</label>
+                          <input type="text" v-model="formCliente.logradouro" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">Número</label>
+                          <input type="text" v-model="formCliente.numero" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1 col-span-1 md:col-span-3">
+                          <label class="font-semibold text-slate-400">Complemento</label>
+                          <input type="text" v-model="formCliente.complemento" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1 col-span-2">
+                          <label class="font-semibold text-slate-400">Bairro</label>
+                          <input type="text" v-model="formCliente.bairro" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1 col-span-1 md:col-span-2">
+                          <label class="font-semibold text-slate-400">Cidade</label>
+                          <input type="text" v-model="formCliente.cidade" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">Estado (UF)</label>
+                          <input type="text" maxlength="2" v-model="formCliente.estado" placeholder="MG" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm uppercase text-center" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- SEÇÃO 3: Políticas Financeiras -->
+                    <div class="border-t border-slate-700/60 pt-4">
+                      <h5 class="text-indigo-400 font-bold uppercase tracking-wider text-[10px] mb-3">3. Configurações de Crediário Próprio</h5>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">Limite Máximo Disponível (R$)</label>
+                          <input type="number" step="0.01" v-model="formCliente.limite_credito" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-indigo-400 font-semibold outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <label class="font-semibold text-slate-400">Bloqueio Administrativo?</label>
+                          <select v-model="formCliente.bloqueado" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm">
+                            <option value="N">Não (Ficha Liberada)</option>
+                            <option value="S">Sim (Bloquear Vendas a Prazo)</option>
+                          </select>
+                        </div>
+                        <div class="flex flex-col gap-1 md:col-span-3" v-if="formCliente.bloqueado === 'S'">
+                          <label class="font-semibold text-rose-400">Motivo do Bloqueio Manual</label>
+                          <textarea v-model="formCliente.motivo_bloqueio" rows="2" placeholder="Descreva o motivo administrativo do bloqueio..." class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm resize-none"></textarea>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <!-- Modal Footer -->
+                  <div class="bg-slate-900 px-6 py-4 border-t border-slate-700 flex justify-end gap-3 shrink-0">
+                    <button 
+                      @click="exibindoModalCliente = false" 
+                      class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-xl text-sm transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      @click="salvarCliente" 
+                      class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2 rounded-xl text-sm transition-colors cursor-pointer shadow-lg"
+                    >
+                      {{ editandoClienteId ? 'Salvar Alterações' : 'Confirmar Cadastro' }}
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
             <!-- 🧭 MÓDULO ADMINISTRATIVO: CRUD DE MENUS E PERMISSÕES (APENAS ADMIN) -->
             <!-- 🧭 MÓDULO ADMINISTRATIVO GLOBAL: CONFIGURAÇÕES (MENUS, EMPRESAS E FILIAIS) -->
             <div v-else-if="abaAtiva === '/config-menus' && usuarioLogado?.role === 'admin'" class="w-full text-left space-y-6 animate-fade-in">
@@ -1738,6 +1938,145 @@ async function carregarRelatorioRecebiveis() {
 watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroCcDataInicio, filtroCcDataFim], () => {
   if (abaAtiva.value === '/recebiveis-cc') {
     carregarRelatorioRecebiveis();
+  }
+});
+
+// ======================================================================
+// 👥 ESTADOS E REQUISIÇÕES DO MÓDULO DE CLIENTES
+// ======================================================================
+const listaClientes = ref([]);
+const filtroBuscaCliente = ref('');
+const exibindoModalCliente = ref(false);
+const editandoClienteId = ref(null);
+
+// 🌟 Correção do Objeto Inicial (Garante a reatividade dos campos de bloqueio)
+const formCliente = ref({
+  nome: '', cpf: '', rg: '', data_nascimento: '',
+  telefone: '', email: '', cep: '', logradouro: '',
+  numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+  limite_credito: 0, 
+  bloqueado: 'N', // 🌟 Corrigido de 'obrigado_bloqueio' para 'bloqueado'
+  motivo_bloqueio: ''
+});
+
+function resetarFormCliente() {
+  editandoClienteId.value = null;
+  formCliente.value = {
+    nome: '', cpf: '', rg: '', data_nascimento: '',
+    telefone: '', email: '', cep: '', logradouro: '',
+    numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+    limite_credito: 0, 
+    bloqueado: 'N', // 🌟 Corrigido aqui também
+    motivo_bloqueio: ''
+  };
+}
+
+// Buscar lista de clientes da API
+async function carregarClientes() {
+  if (!empresaAtivaId.value) return;
+  try {
+    const url = new URL(`${API_URL}/api/clientes`);
+    if (filtroBuscaCliente.value) {
+      url.searchParams.append('busca', filtroBuscaCliente.value);
+    }
+    
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x_empresa_id': empresaAtivaId.value,
+        'x_filial_id': filialAtivaId.value
+      }
+    });
+    if (res.ok) {
+      listaClientes.value = await res.json();
+    }
+  } catch (err) {
+    console.error('Erro ao buscar clientes:', err);
+  }
+}
+
+// Salvar (Criar ou Atualizar)
+async function salvarCliente() {
+  if (!formCliente.value.nome) return alert('O nome do cliente é obrigatório.');
+  
+  try {
+    const url = editandoClienteId.value 
+      ? `${API_URL}/api/clientes/${editandoClienteId.value}`
+      : `${API_URL}/api/clientes`;
+      
+    const method = editandoClienteId.value ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'x_empresa_id': empresaAtivaId.value,
+        'x_filial_id': filialAtivaId.value
+      },
+      body: JSON.stringify(formCliente.value)
+    });
+
+    const dados = await res.json();
+    if (!res.ok) throw new Error(dados.erro || 'Erro ao salvar alteração.');
+
+    exibindoModalCliente.value = false;
+    resetarFormCliente();
+    carregarClientes();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// Preparar modal para edição
+function iniciarEdicaoCliente(cliente) {
+  editandoClienteId.value = cliente.id;
+  // Preenche o formulário buscando do banco ou clonando a linha
+  formCliente.value = { ...cliente };
+  if (cliente.data_nascimento) {
+    formCliente.value.data_nascimento = cliente.data_nascimento.split('T')[0];
+  }
+  exibindoModalCliente.value = true;
+}
+
+// Deletar Cliente
+async function excluirCliente(id) {
+  if (!confirm('Tem certeza de que deseja remover este cliente permanentemente?')) return;
+  try {
+    const res = await fetch(`${API_URL}/api/clientes/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'x_empresa_id': empresaAtivaId.value
+      }
+    });
+    if (res.ok) carregarClientes();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Auto-busca por CEP básico (ViaCEP)
+async function buscarCep() {
+  const cepClean = formCliente.value.cep.replace(/\D/g, '');
+  if (cepClean.length !== 8) return;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
+    const data = await res.json();
+    if (!data.erro) {
+      formCliente.value.logradouro = data.logradouro;
+      formCliente.value.bairro = data.bairro;
+      formCliente.value.cidade = data.localidade;
+      formCliente.value.estado = data.uf;
+    }
+  } catch (err) {
+    console.error('Falha ao autocompletar CEP');
+  }
+}
+
+// Monitorar aba de clientes ou alteração de busca
+watch([abaAtiva, empresaAtivaId, filialAtivaId, filtroBuscaCliente], () => {
+  if (abaAtiva.value === '/clientes') {
+    carregarClientes();
   }
 });
 

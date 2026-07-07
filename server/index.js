@@ -829,6 +829,164 @@ app.get('/api/obter-vendas-periodo', async (req, res) => {
     }
 });
 
+// ======================================================================
+// 👥 ENDPOINTS DO MÓDULO DE CLIENTES (CRUD & VALIDAÇÕES)
+// ======================================================================
+// 1. LISTAR CLIENTES (Filtrando por Empresa/Filial conforme escopo e busca por nome/CPF)
+app.get('/api/clientes', async (req, res) => {
+    const { x_empresa_id } = req.headers; // 🌟 Ignoramos o x_filial_id aqui de propósito
+    const { busca } = req.query;
+
+    if (!x_empresa_id) {
+        return res.status(400).json({ erro: 'O cabeçalho x_empresa_id é obrigatório para escopos compartilhados.' });
+    }
+
+    try {
+        // O SELECT busca estritamente pela Empresa, unificando todas as filiais
+        let query = `
+            SELECT 
+                id, empresa_id, filial_id, nome, cpf, rg, data_nascimento, telefone, email,
+                cep, logradouro, numero, complemento, bairro, cidade, estado, 
+                limite_credito, bloqueado, motivo_bloqueio
+            FROM clientes 
+            WHERE empresa_id = $1 AND deletado = false
+        `; // 🌟 CORRIGIDO: de 'city' para 'cidade'
+        const params = [x_empresa_id];
+
+        if (busca) {
+            const termoClean = busca.replace(/[.\-_]/g, '');
+            query += ` AND (UPPER(nome) LIKE UPPER($2) OR cpf LIKE $2 OR id::text = $2)`;
+            params.push(`%${termoClean}%`);
+        }
+
+        query += ` ORDER BY nome ASC`;
+        
+        const resultado = await pool.query(query, params);
+        return res.json(resultado.rows);
+    } catch (err) {
+        console.error('Erro ao listar clientes compartilhados:', err);
+        return res.status(500).json({ erro: 'Erro interno ao consultar base unificada de clientes.' });
+    }
+});
+
+// 2. CADASTRAR NOVO CLIENTE (Com trava de CPF duplicado por Empresa)
+// 2. CADASTRAR NOVO CLIENTE (Ajustado para Escopo Compartilhado)
+app.post('/api/clientes', async (req, res) => {
+    const { x_empresa_id, x_filial_id } = req.headers;
+    const { 
+        nome, cpf, rg, data_nascimento, telefone, email,
+        cep, logradouro, numero, complemento, bairro, cidade, estado,
+        limite_credito
+    } = req.body;
+
+    // 🌟 AJUSTADO: x_filial_id removido da trava obrigatória para alinhar ao escopo compartilhado
+    if (!x_empresa_id || !nome) {
+        return res.status(400).json({ erro: 'Dados obrigatórios ausentes para o cadastro (Empresa e Nome).' });
+    }
+
+    // Higienização de dados para o banco
+    const cpfClean = cpf ? cpf.replace(/[.\-_]/g, '') : null;
+    const cepClean = cep ? cep.replace(/[.\-_]/g, '') : null;
+    const limiteFormatado = parseFloat(limite_credito) || 0.00;
+
+    try {
+        // Valida se CPF já existe ativo nessa empresa (Escopo global do grupo econômico)
+        if (cpfClean) {
+            const validaCpf = await pool.query(
+                `SELECT id FROM clientes WHERE empresa_id = $1 AND cpf = $2 AND deletado = false`,
+                [x_empresa_id, cpfClean]
+            );
+            if (validaCpf.rows.length > 0) {
+                return res.status(400).json({ erro: 'Este CPF já está cadastrado no sistema.' });
+            }
+        }
+
+        const querySalvar = `
+            INSERT INTO clientes (
+                empresa_id, filial_id, nome, cpf, rg, data_nascimento, telefone, email,
+                cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+            ) RETURNING id, nome;
+        `;
+
+        // 🌟 AJUSTADO: x_filial_id || null garante que se não vier filial, grava nulo sem estourar erro
+        const resultado = await pool.query(querySalvar, [
+            x_empresa_id, x_filial_id || null, nome, cpfClean, rg, data_nascimento || null, telefone, email,
+            cepClean, logradouro, numero, complemento, bairro, cidade, estado, limiteFormatado
+        ]);
+
+        return res.status(201).json({ mensagem: 'Cliente salvo com sucesso!', cliente: resultado.rows[0] });
+    } catch (err) {
+        console.error('Erro ao salvar cliente:', err);
+        return res.status(500).json({ erro: 'Erro interno ao persistir dados do cliente.' });
+    }
+});
+
+// 3. EDITAR CLIENTE EXISTENTE
+app.put('/api/clientes/:id', async (req, res) => {
+    const { x_empresa_id } = req.headers;
+    const { id } = req.params;
+    const { 
+        nome, cpf, rg, data_nascimento, telefone, email,
+        cep, logradouro, numero, complemento, bairro, cidade, estado,
+        limite_credito, bloqueado, motivo_bloqueio
+    } = req.body;
+
+    const cpfClean = cpf ? cpf.replace(/[.\-_]/g, '') : null;
+    const cepClean = cep ? cep.replace(/[.\-_]/g, '') : null;
+    const limiteFormatado = parseFloat(limite_credito) || 0.00;
+
+    try {
+        // Valida duplicidade de CPF ignorando o id atual
+        if (cpfClean) {
+            const validaCpf = await pool.query(
+                `SELECT id FROM clientes WHERE empresa_id = $1 AND cpf = $2 AND id <> $3 AND deletado = false`,
+                [x_empresa_id, cpfClean, id]
+            );
+            if (validaCpf.rows.length > 0) {
+                return res.status(400).json({ erro: 'Outro cliente já utiliza este número de CPF.' });
+            }
+        }
+
+        const queryUpdate = `
+            UPDATE clientes SET
+                nome = $1, cpf = $2, rg = $3, data_nascimento = $4, telefone = $5, email = $6,
+                cep = $7, logradouro = $8, numero = $9, complemento = $10, bairro = $11, 
+                cidade = $12, estado = $13, limite_credito = $14, bloqueado = $15, motivo_bloqueio = $16
+            WHERE id = $17 AND empresa_id = $18 AND deletado = false;
+        `;
+
+        await pool.query(queryUpdate, [
+            nome, cpfClean, rg, data_nascimento || null, telefone, email,
+            cepClean, logradouro, numero, complemento, bairro, cidade, estado, 
+            limiteFormatado, bloqueado || 'N', motivo_bloqueio || null, id, x_empresa_id
+        ]);
+
+        return res.json({ mensagem: 'Cadastro atualizado com sucesso!' });
+    } catch (err) {
+        console.error('Erro ao atualizar cliente:', err);
+        return res.status(500).json({ erro: 'Erro interno ao atualizar dados do cliente.' });
+    }
+});
+
+// 4. DELETAR CLIENTE (Exclusão lógica / Soft Delete)
+app.delete('/api/clientes/:id', async (req, res) => {
+    const { x_empresa_id } = req.headers;
+    const { id } = req.params;
+
+    try {
+        await pool.query(
+            `UPDATE clientes SET deletado = true WHERE id = $1 AND empresa_id = $2`,
+            [id, x_empresa_id]
+        );
+        return res.json({ mensagem: 'Cliente removido com sucesso do sistema.' });
+    } catch (err) {
+        console.error('Erro ao deletar cliente:', err);
+        return res.status(500).json({ erro: 'Erro interno ao processar a exclusão.' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Backend gerencial rodando de forma dinâmica na porta http://localhost:${PORT}`);
 });
