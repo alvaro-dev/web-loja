@@ -1,5 +1,10 @@
 import { createApp } from 'vue'
-import App from './App.vue'
-import './assets/main.css' 
+import { createPinia } from 'pinia' // 🌟 ADICIONADO
+import App from './App.vue' // cite: main.js
+import './assets/main.css' // cite: main.js
 
-createApp(App).mount('#app')
+const app = createApp(App) // cite: main.js
+const pinia = createPinia() // 🌟 ADICIONADO
+
+app.use(pinia) // 🌟 ADICIONADO
+app.mount('#app') // cite: main.js

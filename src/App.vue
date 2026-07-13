@@ -5,7 +5,6 @@
     <!-- 🎛️ TELA 1: ÁREA DE AUTENTICAÇÃO (SÓ EXIBE SE NÃO ESTIVER LOGADO) -->
     <!-- ====================================================================== -->
     <div v-if="!sistemaLiberado" class="w-full flex items-center justify-center p-4">
-      <!-- CARD PRINCIPAL DE LOGIN -->
       <div class="w-full max-w-md bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700/50 p-8 shadow-2xl">
         
         <div class="text-center mb-8">
@@ -20,7 +19,6 @@
 
         <form @submit.prevent="handleLogin" class="space-y-6">
           
-          <!-- Alerta de Erro -->
           <div v-if="mensagemErro" class="p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-center gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 shrink-0">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
@@ -28,15 +26,13 @@
             <span>{{ mensagemErro }}</span>
           </div>
 
-          <!-- Alerta de Sucesso Gerencial -->
           <div v-if="mensagemSucesso" class="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl flex items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/xl" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 shrink-0">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
             <span>{{ mensagemSucesso }}</span>
           </div>
 
-          <!-- Campo Usuário -->
           <div>
             <label for="usuario" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Usuário</label>
             <input 
@@ -49,7 +45,6 @@
             />
           </div>
 
-          <!-- Campo Senha -->
           <div>
             <label for="senha" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Senha</label>
             <input 
@@ -157,7 +152,7 @@
           <!-- 🌟 SELETORES MULTI-TENANT -->
           <div class="flex flex-1 md:flex-none items-center gap-3 max-w-xl text-left">
             <!-- Select Empresa -->
-            <div class="flex flex-col min-w-40]">
+            <div class="flex flex-col min-w-40">
               <label class="text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-0.5">Empresa / Grupo</label>
               <select 
                 v-model="empresaAtivaId"
@@ -439,13 +434,11 @@
               <div class="flex flex-wrap items-center gap-4 bg-slate-800/80 p-6 rounded-2xl border border-slate-700/50 justify-between">
                 <div>
                   <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                    <!-- Ícone original mantido -->
                     Monitoramento de Terminais (PDV)
                   </h3>
                   <p class="text-xs text-slate-400 mt-0.5">Visão macro de movimentações financeiras por dia de abertura.</p>
                 </div>
                 
-                <!-- 📅 NOVO INPUT DE FILTRO DIÁRIO -->
                 <div class="flex items-center gap-3 bg-slate-900/50 border border-slate-700 rounded-xl px-3 py-1.5">
                   <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtrar Dia:</label>
                   <input 
@@ -478,52 +471,45 @@
                     <div v-if="c.status === 'F'" class="flex justify-between"><span class="text-slate-400">Fechado em:</span><span class="text-slate-400 font-mono">{{ c.data_fechamento ? new Date(c.data_fechamento).toLocaleString() : '—' }}</span></div>
                     
                     <div class="card-valores" style="margin-top: 15px; font-size: 14px; line-height: 1.8;">
-    
                       <div style="display: flex; justify-content: space-between;">
                         <span style="color: #888;">Fundo de Gaveta:</span>
                         <span style="font-weight: bold;">R$ {{ Number(c.valor_abertura).toFixed(2) }}</span>
                       </div>
-
                       <div style="display: flex; justify-content: space-between;">
                         <span style="color: #888;">Movimentação Dinheiro (Gaveta):</span>
                         <span :style="{ color: c.dinheiro_turno >= 0 ? 'green' : 'red', fontWeight: 'bold' }">
                           {{ c.dinheiro_turno >= 0 ? '+' : '' }} R$ {{ Number(c.dinheiro_turno).toFixed(2) }}
                         </span>
                       </div>
-
                       <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #444; padding-bottom: 6px; margin-bottom: 6px;">
                         <span style="color: #888;">Recebimentos Eletrônicos (CC/CD/Pix):</span>
                         <span style="color: #007bff; font-weight: bold;">
                           + R$ {{ Number(c.eletronico_turno).toFixed(2) }}
                         </span>
                       </div>
-
                       <div style="display: flex; justify-content: space-between; font-size: 15px;">
                         <span style="font-weight: bold; color: #fff;">Dinheiro Físico em Caixa:</span>
                         <span style="font-weight: bold; color: #28a745;">
                           R$ {{ (Number(c.valor_abertura) + Number(c.dinheiro_turno)).toFixed(2) }}
                         </span>
                       </div>
-
                       <div style="display: flex; justify-content: space-between; font-size: 15px; margin-top: 4px;">
                         <span style="font-weight: bold; color: #fff;">Faturamento Total Turno:</span>
                         <span style="font-weight: bold; color: #6f42c1;">
                           R$ {{ (Number(c.dinheiro_turno) + Number(c.eletronico_turno)).toFixed(2) }}
                         </span>
                       </div>
-
                     </div>
                   </div>
-                  
                 </div>
                 <div v-if="listaMonitoramentoCaixas.length === 0" class="col-span-full py-10 italic text-slate-500">Nenhum caixa ativo mapeado nesta filial.</div>
               </div>
 
-              <div v-if="turnoSelecionadoAcompanhamento" class="space-y-3 pt-4 border-t border-slate-800 animate-fade-in">
+              <div v-if="turnoSelecionadoAcompanhamento" class="space-y-3 pt-4 border-t border-slate-700/60 animate-fade-in text-left">
                 <h4 class="text-sm font-bold text-slate-400 tracking-wider uppercase flex items-center gap-2">
                   <span>📋 Lançamentos do Dia:</span>
                   <span class="text-xs bg-indigo-500/20 text-indigo-400 px-2.5 py-0.5 rounded-full border border-indigo-500/30 font-bold uppercase">
-                    {{ turnoSelecionadoAcompanhamento.caixa_nome }} - Turno {{ turnoSelecionadoAcompanhamento.status === 'A' ? 'Atual' : 'Encerrado' }}
+                    {{ turnoSelecionadoAcompanhamento.caixa_name || turnoSelecionadoAcompanhamento.caixa_nome }} - Turno {{ turnoSelecionadoAcompanhamento.status === 'A' ? 'Atual' : 'Encerrado' }}
                   </span>
                 </h4>
 
@@ -558,7 +544,6 @@
                           R$ {{ Number(v.total).toFixed(2) }}
                         </td>
                       </tr>
-
                       <tr v-if="!extratoVendasTurnoAcompanhamento.length">
                         <td colspan="7" class="px-6 py-8 text-center text-slate-500 italic">Nenhum lançamento efetuado neste turno até o momento.</td>
                       </tr>
@@ -1173,56 +1158,94 @@
 </template>
 
 <script setup>
-import { ref, reactive, nextTick, markRaw, computed, watch } from 'vue';
-import { tenantHeaders } from '@/services/api';
+import { ref, reactive, nextTick, markRaw, watch, computed } from 'vue'; // 🌟 Ajustado: Adicionado 'computed' que estava faltando
+import { storeToRefs } from 'pinia'; 
+
+// 🌟 IMPORTAÇÃO DAS STORES DO PINIA
+import { useAuthStore } from '@/stores/auth';
+import { useTenantStore } from '@/stores/tenant';
+
 import AuthService from '@/services/AuthService';
 import ClienteService from '@/services/ClienteService';
 import UsuarioService from '@/services/UsuarioService';
 import CaixaService from '@/services/CaixaService';
 import ConfigService from '@/services/ConfigService';
 
-// Elementos e Estados Principais
+// Inicializa as stores locais
+const authStore = useAuthStore();
+const tenantStore = useTenantStore();
+
+// Desestrutura propriedades e getters reativos usando storeToRefs
+const { sistemaLiberado, usuarioLogado, listaMenus } = storeToRefs(authStore);
+const { empresaAtivaId, filialAtivaId, listaEmpresasDisponiveis, listaFiliaisFiltradas } = storeToRefs(tenantStore);
+
+// Elementos e Estados de Controle Visual
 const senhaInput = ref(null);
-const sistemaLiberado = ref(false);
 const abaAtiva = ref('');
-const listaMenus = ref([]);
-
-const listaAcessosBrutos = ref([]); 
-const empresaAtivaId = ref('');     
-const filialAtivaId = ref('');      
-
-// Sincroniza os selects superiores com as globais reativas do interceptor HTTP
-watch(empresaAtivaId, (nv) => { tenantHeaders.empresaId = nv; });
-watch(filialAtivaId, (nv) => { tenantHeaders.filialId = nv; });
-
-const listaEmpresasDisponiveis = computed(() => {
-  const mapeado = listaAcessosBrutos.value.map(a => ({ id: a.empresa_id, nome: a.empresa_nome }));
-  return mapeado.filter((value, index, self) => self.findIndex(t => t.id === value.id) === index);
-});
-
-const listaFiliaisFiltradas = computed(() => {
-  return listaAcessosBrutos.value
-    .filter(a => a.empresa_id === empresaAtivaId.value)
-    .map(a => ({ id: a.filial_id, nome: a.filial_nome }));
-});
-
-watch(empresaAtivaId, () => {
-  const filiais = listaFiliaisFiltradas.value;
-  if (filiais.length > 0) {
-    if (!filiais.some(f => f.id === filialAtivaId.value)) {
-      filiaAtivaId.value = filiais[0].id;
-    }
-  } else {
-    filialAtivaId.value = '';
-  }
-});
-
 const subAbaConfig = ref('menus'); 
 const listaCrudEmpresas = ref([]);
 const listaCrudFiliais = ref([]);
 
 const formEmpresa = reactive({ razao_social: '', nome_fantasia: '', cnpj: '' });
 const formFilial = reactive({ empresa_id: '', nome: '', cnpj: '', cidade: '', estado: '' });
+
+// GESTÃO DE OPERADORES VIA SERVICE
+const listaUsuarios = ref([]);
+const mostrarModalCadastro = ref(false);
+const erroCrud = ref('');
+const sucessoCrud = ref('');
+const formNovoUser = reactive({ nome: '', usuario: '', senha: '', role: 'operador', usuario_pdv: 'S' });
+
+// MENUS E ACL VIA SERVICE
+const listaTodosMenus = ref([]);
+const matrizPermissoes = ref([]);
+const formMenu = reactive({ titulo: '', rota: '', icone: 'HomeIcon', ordem: 0 });
+
+// VÍNCULO DE LOJAS VIA SERVICE
+const listaCrudAcessosUsuarios = ref([]);
+const formAcesso = reactive({ usuario_id: '', empresa_id: '', filial_id: '', padrao: false });
+
+// GESTÃO DE TERMINAIS VIA SERVICE
+const listaCaixasPdv = ref([]);
+const mostrarModalCaixa = ref(false);
+const formCaixa = reactive({ nome: '', empresa_id: '', filial_id: '' });
+
+// MONITORAMENTO REALTIME VIA SERVICE
+const listaMonitoramentoCaixas = ref([]);
+const filtroDataAcompanhamento = ref(new Date().toISOString().split('T')[0]);
+const turnoSelecionadoAcompanhamento = ref(null);
+const extratoVendasTurnoAcompanhamento = ref([]);
+
+// GOVERNANÇA DE TENANT VIA SERVICE
+const listaEscopoTabelas = ref([]);
+
+// FINANCEIRO DE CARTÕES VIA SERVICE
+const dadosRecebiveis = ref({ resumoBandeiras: [], extratoParcelas: [] });
+const bandeiraSelecionadaFiltro = ref(''); 
+const filtroCcDataInicio = ref(new Date().toISOString().split('T')[0]);
+const filtroCcDataFim = ref(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
+// CLIENTES & VIACEP VIA SERVICE
+const listaClientes = ref([]);
+const filtroBuscaCliente = ref('');
+const exibindoModalCliente = ref(false);
+const editandoClienteId = ref(null);
+const formCliente = ref({
+  nome: '', cpf: '', rg: '', data_nascimento: '', telefone: '', email: '',
+  cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+  limite_credito: 0, bloqueado: 'N', motivo_bloqueio: ''
+});
+
+// Controles do Login
+const form = reactive({ usuario: '', senha: '' });
+const carregando = ref(false);
+const mensagemErro = ref('');
+const mensagemSucesso = ref('');
+
+const exibirModalSenha = ref(false);
+const guardandoSenha = ref(false);
+const erroModal = ref('');
+const formSenha = reactive({ antiga: '', nova: '', confirmacao: '' });
 
 // MÉTODOS DO CRUD DE EMPRESAS VIA SERVICE
 async function carregarEmpresasCrud() {
@@ -1266,48 +1289,31 @@ async function alternarFlagFilial(id, campo, valor) {
   } catch (err) { console.error(err); }
 }
 
-// Controles do Login
-const form = reactive({ usuario: '', senha: '' });
-const carregando = ref(false);
-const mensagemErro = ref('');
-const mensagemSucesso = ref('');
-const usuarioLogado = ref(null);
+// 🌟 ESTADO DE USUÁRIO LOGADO TEMPORÁRIO LOCAL PARA REDEFINIÇÃO DE SENHA OBRIGATÓRIA
+const usuarioTemporarioTrocaSenha = ref(null);
 
-const exibirModalSenha = ref(false);
-const guardandoSenha = ref(false);
-const erroModal = ref('');
-const formSenha = reactive({ antigas: '', nova: '', confirmacao: '' });
-
-// GESTÃO DE SESSÃO VIA SERVICE
+// GESTÃO DE SESSÃO OTIMIZADA COM PINIA
 async function handleLogin() {
   carregando.value = true;
   mensagemErro.value = '';
   mensagemSucesso.value = '';
-  usuarioLogado.value = null;
 
   try {
     const dados = await AuthService.login(form.usuario, form.senha);
-    usuarioLogado.value = dados.usuario;
 
     if (dados.usuario.trocarSenha) {
+      // 🌟 CORRIGIDO: Atribui a um estado local para evitar a mutação de computada/refs diretas do Pinia
+      usuarioTemporarioTrocaSenha.value = dados.usuario; 
       formSenha.antiga = form.senha;
-      formSenha.nova = '';
-      formSenha.confirmacao = '';
+      formSenha.nova = ''; formSenha.confirmacao = '';
       erroModal.value = '';
       exibirModalSenha.value = true;
-      carregando.value = false;
       return;
     }
 
-    listaMenus.value = dados.menus;
+    authStore.definirSessao(dados);
+    
     if (dados.menus.length > 0) abaAtiva.value = dados.menus[0].rota;
-
-    listaAcessosBrutos.value = dados.acessos;
-    const acessoPadrao = dados.acessos.find(a => a.padrao) || dados.acessos[0];
-    if (acessoPadrao) {
-      empresaAtivaId.value = acessoPadrao.empresa_id;
-      filialAtivaId.value = acessoPadrao.filial_id;
-    }
 
     if (dados.menus.some(m => m.rota === '/usuarios')) carregarUsuariosBanco();
     if (dados.menus.some(m => m.rota === '/config-menus')) {
@@ -1326,7 +1332,6 @@ async function handleLogin() {
 
     mensagemSucesso.value = `Logado com sucesso! Carregando...`;
     setTimeout(() => {
-      sistemaLiberado.value = true;
       form.usuario = ''; form.senha = '';
       mensagemSucesso.value = '';
     }, 800);
@@ -1336,8 +1341,7 @@ async function handleLogin() {
     form.senha = '';
     nextTick(() => { if (senhaInput.value) senhaInput.value.focus(); });
   } finally {
-    if (!exibirModalSenha.value) carregando.value = false;
-    carregando.value = false;
+    carregando.value = false; 
   }
 }
 
@@ -1348,28 +1352,22 @@ async function handleAlterarSenha() {
 
   guardandoSenha.value = true;
   try {
-    await AuthService.alterarSenha(usuarioLogado.value.id, formSenha.antiga, formSenha.nova);
+    const idUsuario = usuarioTemporarioTrocaSenha.value?.id || usuarioLogado.value?.id;
+    await AuthService.alterarSenha(idUsuario, formSenha.antiga, formSenha.nova);
     mensagemSucesso.value = 'Senha alterada com sucesso! Faça login.';
     exibirModalSenha.value = false;
     form.usuario = ''; form.senha = '';
-    usuarioLogado.value = null;
+    authStore.limparSessao();
   } catch (error) {
     erroModal.value = error.message;
   } finally { guardandoSenha.value = false; }
 }
 
-function cancelarTrocaSenha() { exibirModalSenha.value = false; usuarioLogado.value = null; form.senha = ''; }
+function cancelarTrocaSenha() { exibirModalSenha.value = false; authStore.limparSessao(); form.senha = ''; }
 function efetuarLogout() {
-  sistemaLiberado.value = false; listaMenus.value = []; listaAcessosBrutos.value = [];
-  usuarioLogado.value = null; abaAtiva.value = ''; empresaAtivaId.value = ''; filialAtivaId.value = '';
+  authStore.limparSessao();
+  abaAtiva.value = '';
 }
-
-// GESTÃO DE OPERADORES VIA SERVICE
-const listaUsuarios = ref([]);
-const mostrarModalCadastro = ref(false);
-const erroCrud = ref('');
-const sucessoCrud = ref('');
-const formNovoUser = reactive({ nome: '', usuario: '', senha: '', role: 'operador', usuario_pdv: 'S' });
 
 async function carregarUsuariosBanco() {
   try { listaUsuarios.value = await UsuarioService.listarUsuarios(); } catch (error) { erroCrud.value = error.message; }
@@ -1408,11 +1406,6 @@ async function excluirUsuarioCrud(id, nome) {
   } catch (error) { erroCrud.value = error.message; }
 }
 
-// MENUS E ACL VIA SERVICE
-const listaTodosMenus = ref([]);
-const matrizPermissoes = ref([]);
-const formMenu = reactive({ titulo: '', rota: '', icone: 'HomeIcon', ordem: 0 });
-
 async function carregarMenusAdministrativos() {
   try {
     listaTodosMenus.value = await ConfigService.listarMenusACL();
@@ -1445,9 +1438,6 @@ async function ajustarMatrizPermissao(role, menuId, concedido) {
   } catch (error) { console.error(error); }
 }
 
-// VÍNCULO DE LOJAS VIA SERVICE
-const listaCrudAcessosUsuarios = ref([]);
-const formAcesso = reactive({ usuario_id: '', empresa_id: '', filial_id: '', padrao: false });
 watch(() => formAcesso.empresa_id, () => { formAcesso.filial_id = ''; });
 
 async function carregarAcessosUsuariosCrud() {
@@ -1471,10 +1461,6 @@ async function revogarAcessoUsuario(id) {
   } catch (err) { alert(err.message); }
 }
 
-// GESTÃO DE TERMINAIS VIA SERVICE
-const listaCaixasPdv = ref([]);
-const mostrarModalCaixa = ref(false);
-const formCaixa = reactive({ nome: '', empresa_id: '', filial_id: '' });
 watch(() => formCaixa.empresa_id, () => { formCaixa.filial_id = ''; });
 
 async function carregarCaixasPdvCrud() {
@@ -1498,9 +1484,70 @@ async function alternarStatusCaixa(id, valor) {
   } catch (err) { console.error(err); }
 }
 
-// MONITORAMENTO REALTIME VIA SERVICE
-const listaMonitoramentoCaixas = ref([]);
-const filtroDataAcompanhamento = ref(new Date().toISOString().split('T')[0]);
+async function selecionarTurnoParaExtrato(turno) {
+  console.log("Card clicado! Dados do turno recebidos:", turno);
+  
+  if (turnoSelecionadoAcompanhamento.value?.movimento_id === turno.movimento_id) {
+    turnoSelecionadoAcompanhamento.value = null;
+    extratoVendasTurnoAcompanhamento.value = [];
+    return;
+  }
+
+  turnoSelecionadoAcompanhamento.value = turno;
+  extratoVendasTurnoAcompanhamento.value = []; 
+
+  const converterParaHorarioLocalEstrito = (dataOrigem) => {
+    if (!dataOrigem || String(dataOrigem) === 'null' || String(dataOrigem) === 'undefined' || dataOrigem === '') {
+      return '';
+    }
+    try {
+      const d = new Date(dataOrigem);
+      if (isNaN(d.getTime())) {
+        return String(dataOrigem).includes('T') 
+          ? String(dataOrigem).replace('T', ' ').replace('Z', '').split('.')[0] 
+          : String(dataOrigem);
+      }
+      const ano = d.getFullYear();
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      const hora = String(d.getHours()).padStart(2, '0');
+      const minuto = String(d.getMinutes()).padStart(2, '0');
+      const segundo = String(d.getSeconds()).padStart(2, '0');
+
+      return `${ano}-${mes}-${dia} ${hora}:${minuto}:${segundo}`;
+    } catch (e) {
+      console.error("Falha ao formatar data, usando string bruta:", dataOrigem);
+      return String(dataOrigem);
+    }
+  };
+
+  const idDoCaixa = turno.caixa_id || turno.id;
+  const paramAbertura = converterParaHorarioLocalEstrito(turno.data_abertura);
+  const paramFechamento = turno.status === 'A' ? '' : converterParaHorarioLocalEstrito(turno.data_fechamento);
+
+  console.log(`Buscando extrato para Caixa: ${idDoCaixa} | Abertura: ${paramAbertura} | Fechamento: ${paramFechamento}`);
+
+  try {
+    const resposta = await CaixaService.obterExtratoTurno(idDoCaixa, paramAbertura, paramFechamento);
+    console.log("Resposta bruta da API de Extrato:", resposta);
+    
+    if (resposta && resposta.dados) {
+      extratoVendasTurnoAcompanhamento.value = resposta.dados;
+    } else if (resposta && resposta.data && resposta.data.dados) {
+      extratoVendasTurnoAcompanhamento.value = resposta.data.dados;
+    } else if (Array.isArray(resposta)) {
+      extratoVendasTurnoAcompanhamento.value = resposta;
+    } else if (resposta && Array.isArray(resposta.data)) {
+      extratoVendasTurnoAcompanhamento.value = resposta.data;
+    } else {
+      extratoVendasTurnoAcompanhamento.value = [];
+    }
+
+    console.log("Array reativo final preenchido para o template:", extratoVendasTurnoAcompanhamento.value);
+  } catch (err) {
+    console.error('Erro ao buscar lançamentos do turno:', err);
+  }
+}
 
 async function carregarAcompanhamentoCaixas() {
   if (!empresaAtivaId.value || !filialAtivaId.value) return;
@@ -1509,66 +1556,6 @@ async function carregarAcompanhamentoCaixas() {
   } catch (err) { console.error('Falha ao sincronizar monitor de caixas:', err); }
 }
 
-watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroDataAcompanhamento], () => {
-  if (abaAtiva.value === '/acompanhamento-caixas') carregarAcompanhamentoCaixas();
-});
-
-const turnoSelecionadoAcompanhamento = ref(null);
-const extratoVendasTurnoAcompanhamento = ref([]);
-
-async function selecionarTurnoParaExtrato(turno) {
-  // Liga/Desliga: Se clicar no card que já está aberto, recolhe o painel inferior
-  if (turnoSelecionadoAcompanhamento.value?.movimento_id === turno.movimento_id) {
-    turnoSelecionadoAcompanhamento.value = null;
-    extratoVendasTurnoAcompanhamento.value = [];
-    return;
-  }
-
-  turnoSelecionadoAcompanhamento.value = turno;
-  extratoVendasTurnoAcompanhamento.value = []; // Feedback visual de carregamento
-
-  const converterParaHorarioLocalEstrito = (dataOrigem) => {
-    if (!dataOrigem || dataOrigem === 'null' || dataOrigem === 'undefined' || dataOrigem === '') {
-      return '';
-    }
-    
-    const d = new Date(dataOrigem);
-    // Se a conversão falhar ou não for um objeto Date válido, trata a string preventivamente
-    if (isNaN(d.getTime())) {
-      return String(dataOrigem).includes('T') 
-        ? String(dataOrigem).replace('T', ' ').replace('Z', '').split('.')[0] 
-        : String(dataOrigem);
-    }
-
-    const ano = d.getFullYear();
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const dia = String(d.getDate()).padStart(2, '0');
-    const hora = String(d.getHours()).padStart(2, '0');
-    const minuto = String(d.getMinutes()).padStart(2, '0');
-    const segundo = String(d.getSeconds()).padStart(2, '0');
-
-    return `${ano}-${mes}-${dia} ${hora}:${minuto}:${segundo}`;
-  };
-
-  const paramAbertura = converterParaHorarioLocalEstrito(turno.data_abertura);
-  const paramFechamento = turno.status === 'A' ? '' : converterParaHorarioLocalEstrito(turno.data_fechamento);
-
-  try {
-    // 🚀 CHAMA O CAIXASERVICE QUE JÁ DELEGA CORRETAMENTE A REQUISIÇÃO HTTP
-    const resposta = await CaixaService.obterExtratoTurno(turno.caixa_id, paramAbertura, paramFechamento);
-    
-    // Alinha o retorno com a estrutura mapeada do seu backend controller
-    extratoVendasTurnoAcompanhamento.value = resposta.dados || resposta || [];
-  } catch (err) {
-    console.error('Erro ao buscar lançamentos do turno:', err);
-  }
-}
-
-watch([abaAtiva, empresaAtivaId, filialAtivaId], () => { turnoSelecionadoAcompanhamento.value = null; extratoVendasTurnoAcompanhamento.value = []; });
-
-// GOVERNANÇA DE TENANT VIA SERVICE
-const listaEscopoTabelas = ref([]);
-
 async function carregarDicionarioEscopos() {
   try { listaEscopoTabelas.value = await ConfigService.listarEscoposTabelas(); } catch (err) { console.error('Falha ao carregar:', err); }
 }
@@ -1576,12 +1563,6 @@ async function carregarDicionarioEscopos() {
 async function alterarEscopoTabela(tabelaNome, novoEscopo) {
   try { await ConfigService.alterarEscopoTabela(tabelaNome, novoEscopo); } catch (err) { console.error(err); await carregarDicionarioEscopos(); }
 }
-
-watch(abaAtiva, (novaAba) => { if (novaAba === '/configuracoes-escopo') carregarDicionarioEscopos(); });
-
-// FINANCEIRO DE CARTÕES VIA SERVICE
-const dadosRecebiveis = ref({ resumoBandeiras: [], extratoParcelas: [] });
-const bandeiraSelecionadaFiltro = ref(''); 
 
 const parcelasFiltradasPorBandeira = computed(() => {
   if (!bandeiraSelecionadaFiltro.value) return dadosRecebiveis.value.extratoParcelas;
@@ -1592,9 +1573,6 @@ function alternarFiltroBandeira(bandeira) {
   bandeiraSelecionadaFiltro.value = (bandeiraSelecionadaFiltro.value === bandeira) ? '' : bandeira;
 }
 
-const filtroCcDataInicio = ref(new Date().toISOString().split('T')[0]);
-const filtroCcDataFim = ref(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-
 async function carregarRelatorioRecebiveis() {
   if (!empresaAtivaId.value || !filialAtivaId.value) return;
   try {
@@ -1602,22 +1580,6 @@ async function carregarRelatorioRecebiveis() {
     bandeiraSelecionadaFiltro.value = ''; 
   } catch (err) { console.error('Erro ao mapear relatório financeiro:', err); }
 }
-
-watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroCcDataInicio, filtroCcDataFim], () => {
-  if (abaAtiva.value === '/recebiveis-cc') carregarRelatorioRecebiveis();
-});
-
-// CLIENTES & VIACEP VIA SERVICE
-const listaClientes = ref([]);
-const filtroBuscaCliente = ref('');
-const exibindoModalCliente = ref(false);
-const editandoClienteId = ref(null);
-
-const formCliente = ref({
-  nome: '', cpf: '', rg: '', data_nascimento: '', telefone: '', email: '',
-  cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-  limite_credito: 0, bloqueado: 'N', motivo_bloqueio: ''
-});
 
 function resetarFormCliente() {
   editandoClienteId.value = null;
@@ -1667,9 +1629,6 @@ async function buscarCep() {
   } catch (err) { console.error(err); }
 }
 
-watch([abaAtiva, empresaAtivaId, filialAtivaId, filtroBuscaCliente], () => { if (abaAtiva.value === '/clientes') carregarClientes(); });
-
-// 🎨 Helper utilitário para renderizar SVG dinâmico no Vue 3 baseado na string do banco
 function mapearIcone(nomeIcone) {
   const icones = {
     HomeIcon: {
@@ -1690,4 +1649,26 @@ function mapearIcone(nomeIcone) {
   };
   return markRaw(icones[nomeIcone] || icones.HomeIcon);
 }
+
+// 🌟 🔄 CENTRALIZAÇÃO LIMPA E ÚNICA DE WATCHERS FILTRADOS POR MÓDULOS (LIVRE DE DUPLICIDADES E ERROS DE ESCOPO)
+watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroDataAcompanhamento], () => {
+  if (abaAtiva.value === '/acompanhamento-caixas') carregarAcompanhamentoCaixas();
+});
+
+watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroCcDataInicio, filtroCcDataFim], () => {
+  if (abaAtiva.value === '/recebiveis-cc') carregarRelatorioRecebiveis();
+});
+
+watch([abaAtiva, empresaAtivaId, filialAtivaId, filtroBuscaCliente], () => { 
+  if (abaAtiva.value === '/clientes') carregarClientes(); 
+});
+
+watch(abaAtiva, (novaAba) => { 
+  if (novaAba === '/configuracoes-escopo') carregarDicionarioEscopos(); 
+});
+
+watch([abaAtiva, empresaAtivaId, filialAtivaId], () => { 
+  turnoSelecionadoAcompanhamento.value = null; 
+  extratoVendasTurnoAcompanhamento.value = []; 
+});
 </script>
