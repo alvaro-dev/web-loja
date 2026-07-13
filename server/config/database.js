@@ -1,0 +1,21 @@
+import pg from 'pg';
+import 'dotenv/config';
+
+const { Pool } = pg;
+
+const pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    max: 20, // Suporta picos de conexões concorrentes de múltiplos PDVs simultâneos
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+    console.error('🔴 Erro inesperado no Pool de conexões do PostgreSQL:', err.message);
+});
+
+export default pool;

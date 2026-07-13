@@ -797,7 +797,7 @@
                         </div>
                         <div class="flex flex-col gap-1">
                           <label class="font-semibold text-slate-400">Data de Nascimento</label>
-                          <input type="date" v-model="formCliente.data_nascimento" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm [color-scheme:dark]" />
+                          <input type="date" v-model="formCliente.data_nascimento" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white outline-none focus:border-indigo-500 text-sm scheme:dark" />
                         </div>
                         <div class="flex flex-col gap-1">
                           <label class="font-semibold text-slate-400">Telefone / WhatsApp</label>
@@ -1174,8 +1174,12 @@
 
 <script setup>
 import { ref, reactive, nextTick, markRaw, computed, watch } from 'vue';
-
-const API_URL = 'http://192.168.0.18:3000';
+import { tenantHeaders } from '@/services/api';
+import AuthService from '@/services/AuthService';
+import ClienteService from '@/services/ClienteService';
+import UsuarioService from '@/services/UsuarioService';
+import CaixaService from '@/services/CaixaService';
+import ConfigService from '@/services/ConfigService';
 
 // Elementos e Estados Principais
 const senhaInput = ref(null);
@@ -1183,129 +1187,98 @@ const sistemaLiberado = ref(false);
 const abaAtiva = ref('');
 const listaMenus = ref([]);
 
-// ======================================================================
-// 🏢 CONTROLE DE ACESSOS MULTI-EMPRESA / FILIAL (MULTI-TENANT)
-// ======================================================================
-const listaAcessosBrutos = ref([]); // Guarda o retorno cru do banco
-const empresaAtivaId = ref('');     // ID da Empresa Selecionada
-const filialAtivaId = ref('');      // ID da Filial Selecionada
+const listaAcessosBrutos = ref([]); 
+const empresaAtivaId = ref('');     
+const filialAtivaId = ref('');      
 
-// Computado: Extrai e unifica as empresas únicas que o usuário possui acesso
+// Sincroniza os selects superiores com as globais reativas do interceptor HTTP
+watch(empresaAtivaId, (nv) => { tenantHeaders.empresaId = nv; });
+watch(filialAtivaId, (nv) => { tenantHeaders.filialId = nv; });
+
 const listaEmpresasDisponiveis = computed(() => {
   const mapeado = listaAcessosBrutos.value.map(a => ({ id: a.empresa_id, nome: a.empresa_nome }));
-  // Remove duplicados do array de objetos baseado no ID da empresa
   return mapeado.filter((value, index, self) => self.findIndex(t => t.id === value.id) === index);
 });
 
-// Computado: Monitora a empresa selecionada e filtra quais filiais pertencem a ela
 const listaFiliaisFiltradas = computed(() => {
   return listaAcessosBrutos.value
     .filter(a => a.empresa_id === empresaAtivaId.value)
     .map(a => ({ id: a.filial_id, nome: a.filial_nome }));
 });
 
-// Watcher: Se o usuário mudar de empresa, automaticamente selecionamos a primeira filial daquela nova lista
 watch(empresaAtivaId, () => {
   const filiais = listaFiliaisFiltradas.value;
   if (filiais.length > 0) {
-    // Se a filial atual não estiver na nova lista de filiais filtradas, muda para a primeira
     if (!filiais.some(f => f.id === filialAtivaId.value)) {
-      filialAtivaId.value = filiais[0].id;
+      filiaAtivaId.value = filiais[0].id;
     }
   } else {
     filialAtivaId.value = '';
   }
 });
 
-// Controles de Sub-Abas e Dados
-const subAbaConfig = ref('menus'); // Abas internas: 'menus' | 'empresas' | 'filiais'
+const subAbaConfig = ref('menus'); 
 const listaCrudEmpresas = ref([]);
 const listaCrudFiliais = ref([]);
 
-// Formulários reativos
 const formEmpresa = reactive({ razao_social: '', nome_fantasia: '', cnpj: '' });
 const formFilial = reactive({ empresa_id: '', nome: '', cnpj: '', cidade: '', estado: '' });
 
-// 🏢 MÉTODOS DO CRUD DE EMPRESAS
+// MÉTODOS DO CRUD DE EMPRESAS VIA SERVICE
 async function carregarEmpresasCrud() {
-  try {
-    const res = await fetch(`${API_URL}/api/crud-empresas`);
-    if (res.ok) listaCrudEmpresas.value = await res.json();
-  } catch (err) { console.error(err); }
+  try { listaCrudEmpresas.value = await ConfigService.listarEmpresas(); } catch (err) { console.error(err); }
 }
 
 async function salvarEmpresaCrud() {
   try {
-    const res = await fetch(`${API_URL}/api/crud-empresas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formEmpresa)
-    });
-    if (!res.ok) throw new Error('Falha ao registrar empresa.');
+    await ConfigService.salvarEmpresa(formEmpresa);
     formEmpresa.razao_social = ''; formEmpresa.nome_fantasia = ''; formEmpresa.cnpj = '';
-    carregarEmpresasCrud();
+    await carregarEmpresasCrud();
   } catch (err) { alert(err.message); }
 }
 
 async function alternarFlagEmpresa(id, campo, valor) {
   if (campo === 'deletado' && !confirm('Deseja realmente remover esta empresa do sistema?')) return;
   try {
-    const res = await fetch(`${API_URL}/api/crud-empresas/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campo, valor })
-    });
-    if (res.ok) carregarEmpresasCrud();
+    await ConfigService.alternarFlagEmpresa(id, campo, valor);
+    await carregarEmpresasCrud();
   } catch (err) { console.error(err); }
 }
 
-// 📍 MÉTODOS DO CRUD DE FILIAIS
+// MÉTODOS DO CRUD DE FILIAIS VIA SERVICE
 async function carregarFiliaisCrud() {
-  try {
-    const res = await fetch(`${API_URL}/api/crud-filiais`);
-    if (res.ok) listaCrudFiliais.value = await res.json();
-  } catch (err) { console.error(err); }
+  try { listaCrudFiliais.value = await ConfigService.listarFiliais(); } catch (err) { console.error(err); }
 }
 
 async function salvarFilialCrud() {
   try {
-    const res = await fetch(`${API_URL}/api/crud-filiais`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formFilial)
-    });
-    if (!res.ok) throw new Error('Falha ao registrar filial.');
+    await ConfigService.salvarFilial(formFilial);
     formFilial.nome = ''; formFilial.cnpj = ''; formFilial.cidade = ''; formFilial.estado = '';
-    carregarFiliaisCrud();
+    await carregarFiliaisCrud();
   } catch (err) { alert(err.message); }
 }
 
 async function alternarFlagFilial(id, campo, valor) {
   if (campo === 'deletado' && !confirm('Deseja realmente remover esta filial do sistema?')) return;
   try {
-    const res = await fetch(`${API_URL}/api/crud-filiais/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campo, valor })
-    });
-    if (res.ok) carregarFiliaisCrud();
+    await ConfigService.alternarFlagFilial(id, campo, valor);
+    await carregarFiliaisCrud();
   } catch (err) { console.error(err); }
 }
 
-// Controle de Login
+// Controles do Login
 const form = reactive({ usuario: '', senha: '' });
 const carregando = ref(false);
 const mensagemErro = ref('');
 const mensagemSucesso = ref('');
 const usuarioLogado = ref(null);
 
-// Controle do Modal de Senha
 const exibirModalSenha = ref(false);
 const guardandoSenha = ref(false);
 const erroModal = ref('');
-const formSenha = reactive({ antiga: '', nova: '', confirmacao: '' });
+const formSenha = reactive({ antigas: '', nova: '', confirmacao: '' });
 
-// 🚪 1. LOGIN COM REQUISIÇÃO DE MENUS
+// GESTÃO DE SESSÃO VIA SERVICE
 async function handleLogin() {
   carregando.value = true;
   mensagemErro.value = '';
@@ -1313,21 +1286,9 @@ async function handleLogin() {
   usuarioLogado.value = null;
 
   try {
-    const resposta = await fetch(`${API_URL}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuario: form.usuario, senha: form.senha })
-    });
-
-    const dados = await resposta.json();
-
-    if (!resposta.ok) {
-      throw new Error(dados.erro || 'Erro na autenticação.');
-    }
-
+    const dados = await AuthService.login(form.usuario, form.senha);
     usuarioLogado.value = dados.usuario;
 
-    // Se a conta exigir redefinição imediata
     if (dados.usuario.trocarSenha) {
       formSenha.antiga = form.senha;
       formSenha.nova = '';
@@ -1338,53 +1299,35 @@ async function handleLogin() {
       return;
     }
 
-    // Armazena os menus autorizados recebidos do banco e libera o sistema
     listaMenus.value = dados.menus;
-    if (dados.menus.length > 0) {
-      abaAtiva.value = dados.menus[0].rota;
-    }
+    if (dados.menus.length > 0) abaAtiva.value = dados.menus[0].rota;
 
-    // 🏢 Inicializa os acessos Multi-empresa / Filial
     listaAcessosBrutos.value = dados.acessos;
-    
-    // Procura o registro marcado como padrão no banco
     const acessoPadrao = dados.acessos.find(a => a.padrao) || dados.acessos[0];
     if (acessoPadrao) {
       empresaAtivaId.value = acessoPadrao.empresa_id;
       filialAtivaId.value = acessoPadrao.filial_id;
     }
 
-    // Dispara as listagens automáticas se o usuário for um Admin autorizado
     if (dados.menus.some(m => m.rota === '/usuarios')) carregarUsuariosBanco();
-    
     if (dados.menus.some(m => m.rota === '/config-menus')) {
       carregarMenusAdministrativos();
-      carregarEmpresasCrud(); // 🌟 Injeção: Carrega as empresas no CRUD
-      carregarFiliaisCrud();  // 🌟 Injeção: Carrega as filiais no CRUD
-      carregarAcessosUsuariosCrud(); // 🌟 Injeção: Carrega o pivô de acessos
+      carregarEmpresasCrud(); 
+      carregarFiliaisCrud();  
+      carregarAcessosUsuariosCrud(); 
     }
-
     if (dados.menus.some(m => m.rota === '/cadastro-caixas')) {
       carregarCaixasPdvCrud();
-      carregarEmpresasCrud(); // Importante carregar para alimentar os selects do modal
+      carregarEmpresasCrud();
       carregarFiliaisCrud();
     }
-
-    if (dados.menus.some(m => m.rota === '/acompanhamento-caixas')) {
-      carregarAcompanhamentoCaixas();
-    }
-
-    if (dados.menus.some(m => m.rota === '/configuracoes-escopo')) {
-      carregarDicionarioEscopos();
-    }
+    if (dados.menus.some(m => m.rota === '/acompanhamento-caixas')) carregarAcompanhamentoCaixas();
+    if (dados.menus.some(m => m.rota === '/configuracoes-escopo')) carregarDicionarioEscopos();
 
     mensagemSucesso.value = `Logado com sucesso! Carregando...`;
-    
-    // Pequena transição visual antes de abrir
     setTimeout(() => {
       sistemaLiberado.value = true;
-      form.usuario = '';
-      form.senha = '';
+      form.usuario = ''; form.senha = '';
       mensagemSucesso.value = '';
     }, 800);
 
@@ -1394,378 +1337,182 @@ async function handleLogin() {
     nextTick(() => { if (senhaInput.value) senhaInput.value.focus(); });
   } finally {
     if (!exibirModalSenha.value) carregando.value = false;
+    carregando.value = false;
   }
 }
 
-// 🔒 2. REDEFINIÇÃO DE SENHA OBRIGATÓRIA
 async function handleAlterarSenha() {
   erroModal.value = '';
-
-  if (formSenha.nova !== formSenha.confirmacao) {
-    erroModal.value = 'A nova senha e a confirmação não batem.';
-    return;
-  }
-  if (formSenha.nova.length < 4) {
-    erroModal.value = 'A nova senha deve ter pelo menos 4 caracteres.';
-    return;
-  }
+  if (formSenha.nova !== formSenha.confirmacao) return erroModal.value = 'A nova senha e a confirmação não batem.';
+  if (formSenha.nova.length < 4) return erroModal.value = 'A nova senha deve ter pelo menos 4 caracteres.';
 
   guardandoSenha.value = true;
-
   try {
-    const resposta = await fetch(`${API_URL}/api/alterar-senha`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        usuarioId: usuarioLogado.value.id,
-        senhaAntiga: formSenha.antiga,
-        novaSenha: formSenha.nova
-      })
-    });
-
-    const dados = await resposta.json();
-    if (!resposta.ok) throw new Error(dados.erro || 'Erro na alteração.');
-
-    mensagemSucesso.value = 'Senha alterada com sucesso! Faça login com as novas credenciais.';
+    await AuthService.alterarSenha(usuarioLogado.value.id, formSenha.antiga, formSenha.nova);
+    mensagemSucesso.value = 'Senha alterada com sucesso! Faça login.';
     exibirModalSenha.value = false;
-    form.usuario = '';
-    form.senha = '';
+    form.usuario = ''; form.senha = '';
     usuarioLogado.value = null;
-
   } catch (error) {
     erroModal.value = error.message;
-  } finally {
-    guardandoSenha.value = false;
-  }
+  } finally { guardandoSenha.value = false; }
 }
 
-function cancelarTrocaSenha() {
-  exibirModalSenha.value = false;
-  usuarioLogado.value = null;
-  form.senha = '';
-}
-
+function cancelarTrocaSenha() { exibirModalSenha.value = false; usuarioLogado.value = null; form.senha = ''; }
 function efetuarLogout() {
-  sistemaLiberado.value = false;
-  listaMenus.value = [];
-  listaAcessosBrutos.value = [];
-  usuarioLogado.value = null;
-  abaAtiva.value = '';
-  empresaAtivaId.value = '';
-  filialAtivaId.value = '';
+  sistemaLiberado.value = false; listaMenus.value = []; listaAcessosBrutos.value = [];
+  usuarioLogado.value = null; abaAtiva.value = ''; empresaAtivaId.value = ''; filialAtivaId.value = '';
 }
 
-// ======================================================================
-// 👥 ESTADOS E MÉTODOS DO CRUD DE GESTÃO DE USUÁRIOS
-// ======================================================================
+// GESTÃO DE OPERADORES VIA SERVICE
 const listaUsuarios = ref([]);
 const mostrarModalCadastro = ref(false);
 const erroCrud = ref('');
 const sucessoCrud = ref('');
+const formNovoUser = reactive({ nome: '', usuario: '', senha: '', role: 'operador', usuario_pdv: 'S' });
 
-const formNovoUser = reactive({
-  nome: '',
-  usuario: '',
-  senha: '',
-  role: 'operador',
-  usuario_pdv: 'S'
-});
-
-// Busca a lista atualizada de usuários no Postgres
 async function carregarUsuariosBanco() {
-  try {
-    const res = await fetch(`${API_URL}/api/usuarios`);
-    if (!res.ok) throw new Error('Erro ao obter dados de usuários.');
-    listaUsuarios.value = await res.getJson ? res.getJson() : await res.json();
-  } catch (error) {
-    erroCrud.value = error.message;
-  }
+  try { listaUsuarios.value = await UsuarioService.listarUsuarios(); } catch (error) { erroCrud.value = error.message; }
 }
 
 function abrirModalNovoUsuario() {
-  formNovoUser.nome = '';
-  formNovoUser.usuario = '';
-  formNovoUser.senha = '';
-  formNovoUser.role = 'operador';
-  formNovoUser.usuario_pdv = 'S';
-  erroCrud.value = '';
-  sucessoCrud.value = '';
-  mostrarModalCadastro.value = true;
+  formNovoUser.nome = ''; formNovoUser.usuario = ''; formNovoUser.senha = ''; formNovoUser.role = 'operador'; formNovoUser.usuario_pdv = 'S';
+  erroCrud.value = ''; sucessoCrud.value = ''; mostrarModalCadastro.value = true;
 }
 
-// Salva o cadastro novo
 async function salvarNovoUsuario() {
-  erroCrud.value = '';
-  sucessoCrud.value = '';
-  
+  erroCrud.value = ''; sucessoCrud.value = '';
   try {
-    const res = await fetch(`${API_URL}/api/usuarios`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formNovoUser)
-    });
-    const dados = await res.json();
-    
-    if (!res.ok) throw new Error(dados.erro || 'Falha ao processar cadastro.');
-    
+    const dados = await UsuarioService.cadastrarUsuario(formNovoUser);
     sucessoCrud.value = dados.mensagem;
     mostrarModalCadastro.value = false;
-    carregarUsuariosBanco(); // Recarrega a tabela na hora
-  } catch (error) {
-    alert(`Erro: ${error.message}`);
-  }
+    await carregarUsuariosBanco();
+  } catch (error) { alert(`Erro: ${error.message}`); }
 }
 
-// Alterna os status (Bloqueado/Ativo, Acesso PDV, etc) com clique rápido
 async function alternarFlagUsuario(id, campo, valor) {
-  erroCrud.value = '';
-  sucessoCrud.value = '';
+  erroCrud.value = ''; sucessoCrud.value = '';
   try {
-    const res = await fetch(`${API_URL}/api/usuarios/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campo, valor })
-    });
-    if (!res.ok) throw new Error('Falha ao atualizar registro no banco.');
-    carregarUsuariosBanco(); // Atualiza os botões dinamicamente
-  } catch (error) {
-    erroCrud.value = error.message;
-  }
+    await UsuarioService.alternarFlag(id, campo, valor);
+    await carregarUsuariosBanco();
+  } catch (error) { erroCrud.value = error.message; }
 }
 
-// Executa a exclusão lógica
 async function excluirUsuarioCrud(id, nome) {
   if (!confirm(`Tem certeza de que deseja remover o acesso de "${nome}"?`)) return;
-  
-  erroCrud.value = '';
-  sucessoCrud.value = '';
+  erroCrud.value = ''; sucessoCrud.value = '';
   try {
-    const res = await fetch(`${API_URL}/api/usuarios/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Falha ao remover usuário.');
+    await UsuarioService.excluir(id);
     sucessoCrud.value = `O usuário "${nome}" foi removido com sucesso.`;
-    carregarUsuariosBanco();
-  } catch (error) {
-    erroCrud.value = error.message;
-  }
+    await carregarUsuariosBanco();
+  } catch (error) { erroCrud.value = error.message; }
 }
 
-// ======================================================================
-// 🧭 ESTADOS E MÉTODOS DO CRUD DE MENUS E PERMISSÕES (ACL)
-// ======================================================================
+// MENUS E ACL VIA SERVICE
 const listaTodosMenus = ref([]);
 const matrizPermissoes = ref([]);
 const formMenu = reactive({ titulo: '', rota: '', icone: 'HomeIcon', ordem: 0 });
 
-// Puxa do Postgres a tabela de menus cheia
 async function carregarMenusAdministrativos() {
   try {
-    const res = await fetch(`${API_URL}/api/gerenciar-menus`);
-    if (res.ok) listaTodosMenus.value = await res.json();
-    
-    const resPerm = await fetch(`${API_URL}/api/gerenciar-permissoes`);
-    if (resPerm.ok) matrizPermissoes.value = await resPerm.json();
-  } catch (error) {
-    console.error('Falha ao sincronizar painel ACL:', error);
-  }
+    listaTodosMenus.value = await ConfigService.listarMenusACL();
+    matrizPermissoes.value = await ConfigService.obterMatrizPermissoes();
+  } catch (error) { console.error('Falha ao sincronizar painel ACL:', error); }
 }
 
-// Salva um menu novinho
 async function salvarNovoMenuCrud() {
   try {
-    const res = await fetch(`${API_URL}/api/gerenciar-menus`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formMenu)
-    });
-    const dados = await res.json();
-    if (!res.ok) throw new Error(dados.erro || 'Falha ao salvar menu.');
-    
-    // Limpa formulário e recarrega
+    const dados = await ConfigService.salvarMenuACL(formMenu);
     formMenu.titulo = ''; formMenu.rota = ''; formMenu.ordem = 0;
     alert(dados.mensagem);
-    carregarMenusAdministrativos();
-  } catch (error) {
-    alert(error.message);
-  }
+    await carregarMenusAdministrativos();
+  } catch (error) { alert(error.message); }
 }
 
-// Alterna flags do menu (Invisível ou Deletado Lógico)
 async function alternarFlagMenu(id, campo, valor) {
   try {
-    const res = await fetch(`${API_URL}/api/gerenciar-menus/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campo, valor })
-    });
-    if (res.ok) carregarMenusAdministrativos();
-  } catch (error) {
-    console.error(error);
-  }
+    await ConfigService.alternarFlagMenu(id, campo, valor);
+    await carregarMenusAdministrativos();
+  } catch (error) { console.error(error); }
 }
 
-// Verifica localmente no array se a checkbox deve vir marcada
-function checarSeTemPermissao(role, menuId) {
-  return matrizPermissoes.value.some(p => p.role === role && p.menu_id === menuId);
-}
+function checarSeTemPermissao(role, menuId) { return matrizPermissoes.value.some(p => p.role === role && p.menu_id === menuId); }
 
-// Dispara o gatilho que salva a mudança na checkbox direto no Postgres
 async function ajustarMatrizPermissao(role, menuId, concedido) {
   try {
-    const res = await fetch(`${API_URL}/api/gerenciar-permissoes/alternar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, menuId, concedido })
-    });
-    if (res.ok) {
-      // Recarrega as permissões na hora
-      const resPerm = await fetch(`${API_URL}/api/gerenciar-permissoes`);
-      if (resPerm.ok) matrizPermissoes.value = await resPerm.json();
-    }
-  } catch (error) {
-    console.error(error);
-  }
+    await ConfigService.alternarPermissaoACL(role, menuId, concedido);
+    matrizPermissoes.value = await ConfigService.obterMatrizPermissoes();
+  } catch (error) { console.error(error); }
 }
 
-// 🔐 ESTADOS E MÉTODOS DE VÍNCULOS DE ACESSOS (USUÁRIOS X FILIAIS)
+// VÍNCULO DE LOJAS VIA SERVICE
 const listaCrudAcessosUsuarios = ref([]);
 const formAcesso = reactive({ usuario_id: '', empresa_id: '', filial_id: '', padrao: false });
-
-// Watcher para limpar o campo de filial caso o Admin mude de empresa no formulário
-watch(() => formAcesso.empresa_id, () => {
-  formAcesso.filial_id = '';
-});
+watch(() => formAcesso.empresa_id, () => { formAcesso.filial_id = ''; });
 
 async function carregarAcessosUsuariosCrud() {
-  try {
-    const res = await fetch(`${API_URL}/api/crud-usuarios-acessos`);
-    if (res.ok) listaCrudAcessosUsuarios.value = await res.json();
-  } catch (err) { console.error(err); }
+  try { listaCrudAcessosUsuarios.value = await UsuarioService.listarAcessosUsuarios(); } catch (err) { console.error(err); }
 }
 
 async function salvarAcessoUsuarioCrud() {
   try {
-    const res = await fetch(`${API_URL}/api/crud-usuarios-acessos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formAcesso)
-    });
-    const dados = await res.json();
-    if (!res.ok) throw new Error(dados.erro || 'Falha ao vincular acesso.');
-    
-    // Limpa o formulário e recarrega a tabela
+    const dados = await UsuarioService.vincularAcesso(formAcesso);
     formAcesso.usuario_id = ''; formAcesso.empresa_id = ''; formAcesso.filial_id = ''; formAcesso.padrao = false;
     alert(dados.mensagem);
-    carregarAcessosUsuariosCrud();
-  } catch (err) {
-    alert(err.message);
-  }
+    await carregarAcessosUsuariosCrud();
+  } catch (err) { alert(err.message); }
 }
 
 async function revogarAcessoUsuario(id) {
-  if (!confirm('Deseja realmente retirar a permissão de acesso deste usuário para esta filial?')) return;
+  if (!confirm('Deseja realmente retirar a permissão de acesso deste usuário?')) return;
   try {
-    const res = await fetch(`${API_URL}/api/crud-usuarios-acessos/${id}`, { method: 'DELETE' });
-    const dados = await res.json();
-    if (!res.ok) throw new Error(dados.erro || 'Erro ao remover permissão.');
-    
-    carregarAcessosUsuariosCrud();
-  } catch (err) {
-    alert(err.message);
-  }
+    await UsuarioService.revogarAcesso(id);
+    await carregarAcessosUsuariosCrud();
+  } catch (err) { alert(err.message); }
 }
 
-// ======================================================================
-// 📟 ESTADOS E MÉTODOS DO CRUD DE CAIXAS (PDV)
-// ======================================================================
+// GESTÃO DE TERMINAIS VIA SERVICE
 const listaCaixasPdv = ref([]);
 const mostrarModalCaixa = ref(false);
 const formCaixa = reactive({ nome: '', empresa_id: '', filial_id: '' });
-
-// Watcher para resetar filial se mudar a empresa no form do caixa
-watch(() => formCaixa.empresa_id, () => {
-  formCaixa.filial_id = '';
-});
+watch(() => formCaixa.empresa_id, () => { formCaixa.filial_id = ''; });
 
 async function carregarCaixasPdvCrud() {
-  try {
-    const res = await fetch(`${API_URL}/api/crud-caixas`);
-    if (res.ok) listaCaixasPdv.value = await res.json();
-  } catch (err) { console.error(err); }
+  try { listaCaixasPdv.value = await CaixaService.listarCaixas(); } catch (err) { console.error(err); }
 }
-
-function abrirModalNovoCaixa() {
-  formCaixa.nome = ''; formCaixa.empresa_id = ''; formCaixa.filial_id = '';
-  mostrarModalCaixa.value = true;
-}
+function abrirModalNovoCaixa() { formCaixa.nome = ''; formCaixa.empresa_id = ''; formCaixa.filial_id = ''; mostrarModalCaixa.value = true; }
 
 async function salvarCaixaPdv() {
   try {
-    const res = await fetch(`${API_URL}/api/crud-caixas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formCaixa)
-    });
-    const dados = await res.json();
-    if (!res.ok) throw new Error(dados.erro || 'Erro ao registrar caixa.');
-
+    const dados = await CaixaService.cadastrarCaixa(formCaixa);
     alert(dados.mensagem);
     mostrarModalCaixa.value = false;
-    carregarCaixasPdvCrud();
+    await carregarCaixasPdvCrud();
   } catch (err) { alert(err.message); }
 }
 
 async function alternarStatusCaixa(id, valor) {
   try {
-    const res = await fetch(`${API_URL}/api/crud-caixas/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campo: 'ativo', valor })
-    });
-    if (res.ok) carregarCaixasPdvCrud();
+    await CaixaService.alternarStatus(id, valor);
+    await carregarCaixasPdvCrud();
   } catch (err) { console.error(err); }
 }
 
-// ======================================================================
-// 📟 ESTADOS E MÉTODOS DO MONITORAMENTO EM TEMPO REAL DE CAIXAS
-// ======================================================================
+// MONITORAMENTO REALTIME VIA SERVICE
 const listaMonitoramentoCaixas = ref([]);
-// 📅 Campo reativo para filtrar o dia do acompanhamento de turnos (Padrão: Hoje)
 const filtroDataAcompanhamento = ref(new Date().toISOString().split('T')[0]);
 
 async function carregarAcompanhamentoCaixas() {
   if (!empresaAtivaId.value || !filialAtivaId.value) return;
-
   try {
-    // 🌟 Envia o dia escolhido para o backend isolar os turnos
-    const queryParams = new URLSearchParams({
-      dataFiltro: filtroDataAcompanhamento.value
-    });
-
-    const res = await fetch(`${API_URL}/api/acompanhamento-caixas?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x_empresa_id': empresaAtivaId.value,
-        'x_filial_id': filialAtivaId.value
-      }
-    });
-
-    if (res.ok) {
-      listaMonitoramentoCaixas.value = await res.json();
-    }
-  } catch (err) {
-    console.error('Falha ao sincronizar monitor de caixas:', err);
-  }
+    listaMonitoramentoCaixas.value = await CaixaService.carregarAcompanhamento(filtroDataAcompanhamento.value);
+  } catch (err) { console.error('Falha ao sincronizar monitor de caixas:', err); }
 }
 
-// 🔄 ASSISTENTE: Se o usuário mudar de filial no topo da tela, recarrega o painel automaticamente
 watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroDataAcompanhamento], () => {
-  if (abaAtiva.value === '/acompanhamento-caixas') {
-    carregarAcompanhamentoCaixas();
-  }
+  if (abaAtiva.value === '/acompanhamento-caixas') carregarAcompanhamentoCaixas();
 });
 
-// Variable e Estados para o Extrato Dinâmico do Acompanhamento de Caixas
 const turnoSelecionadoAcompanhamento = ref(null);
 const extratoVendasTurnoAcompanhamento = ref([]);
 
@@ -1780,12 +1527,18 @@ async function selecionarTurnoParaExtrato(turno) {
   turnoSelecionadoAcompanhamento.value = turno;
   extratoVendasTurnoAcompanhamento.value = []; // Feedback visual de carregamento
 
-  // 🌟 CONVERSOR DEFINITIVO: Extrai o horário exatamente igual ao relógio que vês no ecrã
   const converterParaHorarioLocalEstrito = (dataOrigem) => {
-    if (!dataOrigem || dataOrigem === 'null' || dataOrigem === 'undefined' || dataOrigem === '') return '';
+    if (!dataOrigem || dataOrigem === 'null' || dataOrigem === 'undefined' || dataOrigem === '') {
+      return '';
+    }
     
     const d = new Date(dataOrigem);
-    if (isNaN(d.getTime())) return String(dataOrigem).replace('T', ' ').replace('Z', '').split('.')[0];
+    // Se a conversão falhar ou não for um objeto Date válido, trata a string preventivamente
+    if (isNaN(d.getTime())) {
+      return String(dataOrigem).includes('T') 
+        ? String(dataOrigem).replace('T', ' ').replace('Z', '').split('.')[0] 
+        : String(dataOrigem);
+    }
 
     const ano = d.getFullYear();
     const mes = String(d.getMonth() + 1).padStart(2, '0');
@@ -1794,291 +1547,127 @@ async function selecionarTurnoParaExtrato(turno) {
     const minuto = String(d.getMinutes()).padStart(2, '0');
     const segundo = String(d.getSeconds()).padStart(2, '0');
 
-    // Força o envio estrito de "2026-07-06 22:49:06" para a API do backend
     return `${ano}-${mes}-${dia} ${hora}:${minuto}:${segundo}`;
   };
 
   const paramAbertura = converterParaHorarioLocalEstrito(turno.data_abertura);
   const paramFechamento = turno.status === 'A' ? '' : converterParaHorarioLocalEstrito(turno.data_fechamento);
 
-  const queryParams = new URLSearchParams({
-    caixaId: turno.caixa_id,
-    dataAbertura: paramAbertura,
-    dataFechamento: paramFechamento
-  });
-
   try {
-    const res = await fetch(`${API_URL}/api/obter-vendas-periodo?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x_empresa_id': empresaAtivaId.value,
-        'x_filial_id': filialAtivaId.value
-      }
-    });
-
-    if (res.ok) {
-      const resposta = await res.json();
-      extratoVendasTurnoAcompanhamento.value = resposta.dados || resposta || [];
-    }
+    // 🚀 CHAMA O CAIXASERVICE QUE JÁ DELEGA CORRETAMENTE A REQUISIÇÃO HTTP
+    const resposta = await CaixaService.obterExtratoTurno(turno.caixa_id, paramAbertura, paramFechamento);
+    
+    // Alinha o retorno com a estrutura mapeada do seu backend controller
+    extratoVendasTurnoAcompanhamento.value = resposta.dados || resposta || [];
   } catch (err) {
     console.error('Erro ao buscar lançamentos do turno:', err);
   }
 }
 
-// Limpa o painel se o usuário alternar de aba, empresa ou filial
-watch([abaAtiva, empresaAtivaId, filialAtivaId], () => {
-  turnoSelecionadoAcompanhamento.value = null;
-  extratoVendasTurnoAcompanhamento.value = [];
-});
+watch([abaAtiva, empresaAtivaId, filialAtivaId], () => { turnoSelecionadoAcompanhamento.value = null; extratoVendasTurnoAcompanhamento.value = []; });
 
-// ======================================================================
-// 🧠 ESTADOS E MÉTODOS DA GOVERNANÇA DE ESCOPO MULT-TENANT
-// ======================================================================
+// GOVERNANÇA DE TENANT VIA SERVICE
 const listaEscopoTabelas = ref([]);
 
 async function carregarDicionarioEscopos() {
-  try {
-    const res = await fetch(`${API_URL}/api/tabelas-escopo`);
-    if (res.ok) {
-      listaEscopoTabelas.value = await res.json();
-    }
-  } catch (err) {
-    console.error('Falha ao carregar tabelas de escopo:', err);
-  }
+  try { listaEscopoTabelas.value = await ConfigService.listarEscoposTabelas(); } catch (err) { console.error('Falha ao carregar:', err); }
 }
 
 async function alterarEscopoTabela(tabelaNome, novoEscopo) {
-  try {
-    const res = await fetch(`${API_URL}/api/tabelas-escopo/${tabelaNome}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ escopo: novoEscopo })
-    });
-
-    if (res.ok) {
-      // Exibe um alerta rápido ou toast de confirmação
-      console.log(`[TENANT] Escopo da tabela ${tabelaNome} alterado para ${novoEscopo}.`);
-    } else {
-      alert('Erro ao persistir alteração de escopo no banco de dados.');
-      // Desfaz a alteração visual recarregando os dados originais
-      await carregarDicionarioEscopos();
-    }
-  } catch (err) {
-    console.error('Erro ao atualizar escopo:', err);
-    await carregarDicionarioEscopos();
-  }
+  try { await ConfigService.alterarEscopoTabela(tabelaNome, novoEscopo); } catch (err) { console.error(err); await carregarDicionarioEscopos(); }
 }
 
-// Monitora se a aba de escopo foi aberta para carregar a lista
-watch(abaAtiva, (novaAba) => {
-  if (novaAba === '/configuracoes-escopo') {
-    carregarDicionarioEscopos();
-  }
-});
+watch(abaAtiva, (novaAba) => { if (novaAba === '/configuracoes-escopo') carregarDicionarioEscopos(); });
 
-// ======================================================================
-// 💳 ESTADOS E MÉTODOS DO RELATÓRIO DE RECEBÍVEIS DE CARTÃO (CC)
-// ======================================================================
+// FINANCEIRO DE CARTÕES VIA SERVICE
 const dadosRecebiveis = ref({ resumoBandeiras: [], extratoParcelas: [] });
-const bandeiraSelecionadaFiltro = ref(''); // Por padrão inicia vazio (Exibe Tudo)
+const bandeiraSelecionadaFiltro = ref(''); 
 
-// 🌟 PROPRIEDADE COMPUTADA INTELIGENTE: Se houver filtro, filtra. Caso contrário, exibe tudo.
 const parcelasFiltradasPorBandeira = computed(() => {
-  if (!bandeiraSelecionadaFiltro.value) {
-    return dadosRecebiveis.value.extratoParcelas; // Retorna a lista completa original
-  }
-  return dadosRecebiveis.value.extratoParcelas.filter(
-    p => p.bandeira === bandeiraSelecionadaFiltro.value
-  );
+  if (!bandeiraSelecionadaFiltro.value) return dadosRecebiveis.value.extratoParcelas;
+  return dadosRecebiveis.value.extratoParcelas.filter(p => p.bandeira === bandeiraSelecionadaFiltro.value);
 });
 
-// 🌟 FUNÇÃO LIGA/DESLIGA: Controla o clique do card de forma interativa
 function alternarFiltroBandeira(bandeira) {
-  if (bandeiraSelecionadaFiltro.value === bandeira) {
-    bandeiraSelecionadaFiltro.value = ''; // Clique duplo no mesmo card desliga o filtro e mostra tudo
-  } else {
-    bandeiraSelecionadaFiltro.value = bandeira; // Isola os dados do card clicado
-  }
+  bandeiraSelecionadaFiltro.value = (bandeiraSelecionadaFiltro.value === bandeira) ? '' : bandeira;
 }
 
-// 📅 Filtros de período para projeção de cartões (Padrão: Próximos 30 dias)
 const filtroCcDataInicio = ref(new Date().toISOString().split('T')[0]);
 const filtroCcDataFim = ref(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
 async function carregarRelatorioRecebiveis() {
   if (!empresaAtivaId.value || !filialAtivaId.value) return;
-
   try {
-    // 🌟 Adiciona o escopo de datas no parâmetro da rota
-    const queryParams = new URLSearchParams({
-      dataInicio: filtroCcDataInicio.value,
-      dataFim: filtroCcDataFim.value
-    });
-
-    const res = await fetch(`${API_URL}/api/relatorio-recebiveis?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x_empresa_id': empresaAtivaId.value,
-        'x_filial_id': filialAtivaId.value
-      }
-    });
-
-    if (res.ok) {
-      dadosRecebiveis.value = await res.json();
-      bandeiraSelecionadaFiltro.value = ''; 
-    }
-  } catch (err) {
-    console.error('Erro ao mapear relatório financeiro:', err);
-  }
+    dadosRecebiveis.value = await ConfigService.carregarRelatorioRecebiveis(filtroCcDataInicio.value, filtroCcDataFim.value);
+    bandeiraSelecionadaFiltro.value = ''; 
+  } catch (err) { console.error('Erro ao mapear relatório financeiro:', err); }
 }
 
-// Recarrega se trocar de aba, empresa ou filial
 watch([empresaAtivaId, filialAtivaId, abaAtiva, filtroCcDataInicio, filtroCcDataFim], () => {
-  if (abaAtiva.value === '/recebiveis-cc') {
-    carregarRelatorioRecebiveis();
-  }
+  if (abaAtiva.value === '/recebiveis-cc') carregarRelatorioRecebiveis();
 });
 
-// ======================================================================
-// 👥 ESTADOS E REQUISIÇÕES DO MÓDULO DE CLIENTES
-// ======================================================================
+// CLIENTES & VIACEP VIA SERVICE
 const listaClientes = ref([]);
 const filtroBuscaCliente = ref('');
 const exibindoModalCliente = ref(false);
 const editandoClienteId = ref(null);
 
-// 🌟 Correção do Objeto Inicial (Garante a reatividade dos campos de bloqueio)
 const formCliente = ref({
-  nome: '', cpf: '', rg: '', data_nascimento: '',
-  telefone: '', email: '', cep: '', logradouro: '',
-  numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-  limite_credito: 0, 
-  bloqueado: 'N', // 🌟 Corrigido de 'obrigado_bloqueio' para 'bloqueado'
-  motivo_bloqueio: ''
+  nome: '', cpf: '', rg: '', data_nascimento: '', telefone: '', email: '',
+  cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+  limite_credito: 0, bloqueado: 'N', motivo_bloqueio: ''
 });
 
 function resetarFormCliente() {
   editandoClienteId.value = null;
   formCliente.value = {
-    nome: '', cpf: '', rg: '', data_nascimento: '',
-    telefone: '', email: '', cep: '', logradouro: '',
-    numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-    limite_credito: 0, 
-    bloqueado: 'N', // 🌟 Corrigido aqui também
-    motivo_bloqueio: ''
+    nome: '', cpf: '', rg: '', data_nascimento: '', telefone: '', email: '',
+    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+    limite_credito: 0, bloqueado: 'N', motivo_bloqueio: ''
   };
 }
 
-// Buscar lista de clientes da API
 async function carregarClientes() {
   if (!empresaAtivaId.value) return;
-  try {
-    const url = new URL(`${API_URL}/api/clientes`);
-    if (filtroBuscaCliente.value) {
-      url.searchParams.append('busca', filtroBuscaCliente.value);
-    }
-    
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x_empresa_id': empresaAtivaId.value,
-        'x_filial_id': filialAtivaId.value
-      }
-    });
-    if (res.ok) {
-      listaClientes.value = await res.json();
-    }
-  } catch (err) {
-    console.error('Erro ao buscar clientes:', err);
-  }
+  try { listaClientes.value = await ClienteService.listar(filtroBuscaCliente.value); } catch (err) { console.error(err); }
 }
 
-// Salvar (Criar ou Atualizar)
 async function salvarCliente() {
   if (!formCliente.value.nome) return alert('O nome do cliente é obrigatório.');
-  
   try {
-    const url = editandoClienteId.value 
-      ? `${API_URL}/api/clientes/${editandoClienteId.value}`
-      : `${API_URL}/api/clientes`;
-      
-    const method = editandoClienteId.value ? 'PUT' : 'POST';
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'x_empresa_id': empresaAtivaId.value,
-        'x_filial_id': filialAtivaId.value
-      },
-      body: JSON.stringify(formCliente.value)
-    });
-
-    const dados = await res.json();
-    if (!res.ok) throw new Error(dados.erro || 'Erro ao salvar alteração.');
-
+    await ClienteService.salvar(formCliente.value, editandoClienteId.value);
     exibindoModalCliente.value = false;
     resetarFormCliente();
-    carregarClientes();
-  } catch (err) {
-    alert(err.message);
-  }
+    await carregarClientes();
+  } catch (err) { alert(err.message); }
 }
 
-// Preparar modal para edição
 function iniciarEdicaoCliente(cliente) {
   editandoClienteId.value = cliente.id;
-  // Preenche o formulário buscando do banco ou clonando a linha
   formCliente.value = { ...cliente };
-  if (cliente.data_nascimento) {
-    formCliente.value.data_nascimento = cliente.data_nascimento.split('T')[0];
-  }
+  if (cliente.data_nascimento) formCliente.value.data_nascimento = cliente.data_nascimento.split('T')[0];
   exibindoModalCliente.value = true;
 }
 
-// Deletar Cliente
 async function excluirCliente(id) {
-  if (!confirm('Tem certeza de que deseja remover este cliente permanentemente?')) return;
-  try {
-    const res = await fetch(`${API_URL}/api/clientes/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'x_empresa_id': empresaAtivaId.value
-      }
-    });
-    if (res.ok) carregarClientes();
-  } catch (err) {
-    console.error(err);
-  }
+  if (!confirm('Tem certeza de que deseja remover este cliente?')) return;
+  try { await ClienteService.excluir(id); await carregarClientes(); } catch (err) { console.error(err); }
 }
 
-// Auto-busca por CEP básico (ViaCEP)
 async function buscarCep() {
-  const cepClean = formCliente.value.cep.replace(/\D/g, '');
-  if (cepClean.length !== 8) return;
   try {
-    const res = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
-    const data = await res.json();
-    if (!data.erro) {
+    const data = await ClienteService.consultarCep(formCliente.value.cep);
+    if (data) {
       formCliente.value.logradouro = data.logradouro;
       formCliente.value.bairro = data.bairro;
       formCliente.value.cidade = data.localidade;
       formCliente.value.estado = data.uf;
     }
-  } catch (err) {
-    console.error('Falha ao autocompletar CEP');
-  }
+  } catch (err) { console.error(err); }
 }
 
-// Monitorar aba de clientes ou alteração de busca
-watch([abaAtiva, empresaAtivaId, filialAtivaId, filtroBuscaCliente], () => {
-  if (abaAtiva.value === '/clientes') {
-    carregarClientes();
-  }
-});
+watch([abaAtiva, empresaAtivaId, filialAtivaId, filtroBuscaCliente], () => { if (abaAtiva.value === '/clientes') carregarClientes(); });
 
 // 🎨 Helper utilitário para renderizar SVG dinâmico no Vue 3 baseado na string do banco
 function mapearIcone(nomeIcone) {
