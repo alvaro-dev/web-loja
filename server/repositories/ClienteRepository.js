@@ -45,14 +45,14 @@ class ClienteRepository {
         const query = `
             INSERT INTO clientes (
                 empresa_id, filial_id, nome, cpf, rg, data_nascimento, telefone, email,
-                cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+                cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito, bloqueado, motivo_bloqueio
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
             RETURNING id, nome;
         `;
         const res = await executor.query(query, [
             empresaId, filialId || null, dados.nome, dados.cpfClean, dados.rg, dados.data_nascimento || null,
             dados.telefone, dados.email, dados.cepClean, dados.logradouro, dados.numero, dados.complemento,
-            dados.bairro, dados.cidade, dados.estado, dados.limiteFormatado
+            dados.bairro, dados.cidade, dados.estado, dados.limiteFormatado, dados.bloqueado || 'N', dados.motivo_bloqueio || null
         ]);
         return res.rows[0];
     }

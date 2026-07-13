@@ -19,7 +19,7 @@ class ClienteController {
 
     async cadastrar(req, res) {
         const { x_empresa_id, x_filial_id } = req.headers;
-        const { nome, cpf, rg, data_nascimento, telefone, email, cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito } = req.body;
+        const { nome, cpf, rg, data_nascimento, telefone, email, cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito, bloqueado, motivo_bloqueio } = req.body;
 
         if (!x_empresa_id || !nome) return res.status(400).json({ erro: 'Dados obrigatórios ausentes.' });
 
@@ -44,7 +44,9 @@ class ClienteController {
                 nome, rg, data_nascimento, telefone, email, logradouro, numero, complemento, bairro, cidade, estado,
                 cpfClean,
                 cepClean: cep ? cep.replace(/[.\-_]/g, '') : null,
-                limiteFormatado: parseFloat(limite_credito) || 0.00
+                limiteFormatado: parseFloat(limite_credito) || 0.00,
+                bloqueado: bloqueado || 'N', 
+                motivo_bloqueio: bloqueado === 'S' ? motivo_bloqueio : null
             };
 
             const novoCliente = await ClienteRepository.criar(payload, x_empresa_id, x_filial_id, client);
