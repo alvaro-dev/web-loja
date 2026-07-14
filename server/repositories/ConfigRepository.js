@@ -128,7 +128,14 @@ class ConfigRepository {
 
     async criarMenuACL(m, clientExterno = null) {
         const executor = clientExterno || pool;
-        await executor.query('INSERT INTO menus (id, titulo, rota, icone, ordem, ativo, deletado) VALUES (gen_random_uuid(), $1, $2, $3, $4 || 0, true, false)', [m.titulo, m.rota, m.icone, m.ordem]);
+        
+        // Se m.ordem for nulo, indefinido ou vazio, assume 0.
+        const ordemNumerica = parseInt(m.ordem, 10) || 0;
+
+        await executor.query(
+            'INSERT INTO menus (id, titulo, rota, icone, ordem, ativo, deletado) VALUES (gen_random_uuid(), $1, $2, $3, $4, true, false)', 
+            [m.titulo, m.rota, m.icone, ordemNumerica]
+        );
     }
 
     async atualizarFlagMenu(id, campo, valor) {

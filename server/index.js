@@ -6,7 +6,8 @@ import AuthController from './controllers/AuthController.js';
 import UsuarioController from './controllers/UsuarioController.js';
 import ClienteController from './controllers/ClienteController.js';
 import CaixaController from './controllers/CaixaController.js';
-import ConfigController from './controllers/ConfigController.js'; // 🌟 ADICIONADO
+import ConfigController from './controllers/ConfigController.js';
+import CrediarioController from './controllers/CrediarioController.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,10 @@ app.get('/api/clientes', ClienteController.listar);
 app.post('/api/clientes', ClienteController.cadastrar);
 app.put('/api/clientes/:id', ClienteController.atualizar);
 app.delete('/api/clientes/:id', ClienteController.deletar);
+
+// 💵 🌟 ROTAS DO NOVO MÓDULO DE CREDIÁRIO PRÓPRIO E BAIXAS
+app.get('/api/crediario/extrato', CrediarioController.obterExtrato);
+app.post('/api/crediario/baixar', CrediarioController.baixarParcelas);
 
 // 📟 ROTAS DO MÓDULO DE CAIXAS (PDV) E MONITORAMENTO
 app.get('/api/crud-caixas', CaixaController.listar);
