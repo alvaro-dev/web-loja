@@ -1,9 +1,9 @@
-import { request } from './api';
+// src/services/CrediarioService.js
+import { request } from './api.js'; // 🌟 Importa o 'request' correto do seu projeto
 
 class CrediarioService {
     /**
      * Busca os dados da ficha de crediário de um cliente específico pelo Nome ou CPF
-     * Retorna os dados resumidos do cliente e a lista de parcelas na tabela 'contas_a_receber'
      */
     async buscarExtrato(termoBusca) {
         if (!termoBusca || !termoBusca.trim()) {
@@ -11,31 +11,36 @@ class CrediarioService {
         }
         
         try {
-            const resposta = await api.get(`/api/crediario/extrato`, {
-                params: { busca: termoBusca.trim() }
+            const termoCodificado = encodeURIComponent(termoBusca.trim());
+            const resposta = await request(`/api/crediario/extrato?busca=${termoCodificado}`, {
+                method: 'GET'
             });
-            return resposta.data;
+            
+            return resposta.data || resposta;
         } catch (error) {
-            const mensagem = error.response?.data?.erro || 'Erro ao conectar ao servidor de crediário.';
+            const mensagem = error.response?.data?.erro || error.message || 'Erro ao conectar ao servidor de crediário.';
             throw new Error(mensagem);
         }
     }
-
+    
     /**
      * Processa a baixa em lote de uma ou mais parcelas do crediário do cliente
-     * Envia os IDs das parcelas selecionadas e o meio de pagamento (DN, PX, CD)
      */
     async processarBaixaTulos(payload) {
-        // payload esperado: { clienteId: string, parcelasIds: Array, formaPagamento: string }
         if (!payload.parcelasIds || payload.parcelasIds.length === 0) {
             throw new Error('Nenhuma parcela foi selecionada para recebimento.');
         }
 
         try {
-            const resposta = await api.post(`/api/crediario/baixar`, payload);
-            return resposta.data;
+            // 🌟 CORRIGIDO: Usa 'request' com o método POST e repassa o payload no body (data)
+            const resposta = await request(`/api/crediario/baixar`, {
+                method: 'POST',
+                data: payload
+            });
+            
+            return resposta.data || resposta;
         } catch (error) {
-            const mensagem = error.response?.data?.erro || 'Falha crítica ao registrar baixa do crediário.';
+            const mensagem = error.response?.data?.erro || error.message || 'Falha crítica ao registrar baixa do crediário.';
             throw new Error(mensagem);
         }
     }

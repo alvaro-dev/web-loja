@@ -6,15 +6,14 @@ class CrediarioRepository {
      * Busca os dados da ficha cadastral do cliente e suas parcelas abertas
      */
     async obterFichaClientePorTermo(empresaId, termoBusca) {
-        // Limpa caracteres especiais do CPF para a busca
         const termoClean = termoBusca.replace(/[.\-_]/g, '');
 
-        // 1. Localiza a ficha do cliente respeitando o escopo Multi-Tenant
         const sqlCliente = `
             SELECT id, nome, cpf, limite_credito, bloqueado
             FROM clientes
             WHERE empresa_id = $1 
               AND (nome ILIKE $2 OR cpf = $3)
+              AND deletado = false
             LIMIT 1;
         `;
         const resCliente = await pool.query(sqlCliente, [empresaId, `%${termoBusca}%`, termoClean]);
@@ -22,7 +21,6 @@ class CrediarioRepository {
         if (resCliente.rows.length === 0) return null;
         const cliente = resCliente.rows[0];
 
-        // 2. Busca todas as parcelas pendentes (status 'A' ou 'P') ordenadas por vencimento
         const sqlParcelas = `
             SELECT 
                 id, 
@@ -37,6 +35,7 @@ class CrediarioRepository {
             WHERE empresa_id = $1 
               AND cliente_id = $2
               AND status IN ('A', 'P')
+              AND deletado = false
             ORDER BY data_vencimento ASC;
         `;
         const resParcelas = await pool.query(sqlParcelas, [empresaId, cliente.id]);
@@ -70,14 +69,13 @@ class CrediarioRepository {
         const sql = `
             INSERT INTO vendas (
                 id, movimento_id, caixa_id, total, forma_pagamento, 
-                origem, descricao_movimento, data_venda
+                data_venda, deletado
             ) VALUES (
                 gen_random_uuid(), $1, $2, $3, $4, 
-                'E', $5, CURRENT_TIMESTAMP
+                CURRENT_TIMESTAMP, false
             );
         `;
-        const descricao = `Rec. Crediário - ${clienteNome}`;
-        await clientContext.query(sql, [movimentoId, caixaId, valor, formaPagamento, descricao]);
+        await clientContext.query(sql, [movimentoId, caixaId, valor, formaPagamento]);
     }
 }
 
