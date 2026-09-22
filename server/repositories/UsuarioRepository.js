@@ -108,7 +108,7 @@ class UsuarioRepository {
         const client = await pool.connect();
         try {
             // Colunas são validadas de forma estrita no controller antes de entrar aqui
-            await client.query(`UPDATE usuarios SET ${campo} = $1 WHERE id = $2`, [valor, id]);
+            await client.query(`UPDATE usuarios SET ${campo} = $1 WHERE id = $2::uuid`, [valor, id]);
         } finally {
             client.release();
         }

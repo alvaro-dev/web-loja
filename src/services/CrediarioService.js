@@ -1,9 +1,49 @@
 // src/services/CrediarioService.js
-import { request } from './api.js'; // 🌟 Importa o 'request' correto do seu projeto
+import { request } from './api'; // 🌟 Importa apenas o request
 
-class CrediarioService {
+/**
+ * Recupera o ID da empresa ativa que está selecionada no sistema.
+ */
+function obterEmpresaIdAtivo() {
+    const filialAtiva = localStorage.getItem('filialAtiva') || localStorage.getItem('empresaAtiva');
+    if (filialAtiva) {
+        try {
+            const obj = JSON.parse(filialAtiva);
+            if (obj.empresa_id) return obj.empresa_id;
+            if (obj.id) return obj.id;
+        } catch (e) {
+            if (filialAtiva !== 'undefined' && filialAtiva !== 'null') return filialAtiva;
+        }
+    }
+
+    const empresaId = localStorage.getItem('empresaId') || 
+                      localStorage.getItem('tenantId') ||
+                      JSON.parse(localStorage.getItem('user') || '{}')?.empresa_id;
+
+    return (empresaId && empresaId !== 'undefined' && empresaId !== 'null') ? empresaId : '';
+}
+
+/**
+ * Monta os cabeçalhos de autenticação padrão
+ */
+function obterHeadersAutenticados() {
+    const token = localStorage.getItem('token') || 
+                  localStorage.getItem('@App:token') || 
+                  JSON.parse(localStorage.getItem('user') || '{}')?.token;
+
+    const headers = {};
+
+    if (token) {
+        const tokenLimpo = token.replace(/"/g, '');
+        headers['Authorization'] = `Bearer ${tokenLimpo}`;
+    }
+
+    return headers;
+}
+
+const CrediarioService = {
     /**
-     * Busca os dados da ficha de crediário de um cliente específico pelo Nome ou CPF
+     * Busca os dados da ficha de crediário
      */
     async buscarExtrato(termoBusca) {
         if (!termoBusca || !termoBusca.trim()) {
@@ -12,19 +52,22 @@ class CrediarioService {
         
         try {
             const termoCodificado = encodeURIComponent(termoBusca.trim());
-            const resposta = await request(`/api/crediario/extrato?busca=${termoCodificado}`, {
-                method: 'GET'
+            const headers = obterHeadersAutenticados();
+            const empresaId = obterEmpresaIdAtivo();
+
+            const resposta = await request(`/api/crediario/extrato?busca=${termoCodificado}&empresaId=${empresaId}`, {
+                method: 'GET',
+                headers: headers
             });
             
-            return resposta.data || resposta;
+            return resposta;
         } catch (error) {
-            const mensagem = error.response?.data?.erro || error.message || 'Erro ao conectar ao servidor de crediário.';
-            throw new Error(mensagem);
+            throw new Error(error.message || 'Erro ao conectar ao servidor de crediário.');
         }
-    }
-    
+    },
+
     /**
-     * Processa a baixa em lote de uma ou mais parcelas do crediário do cliente
+     * Processa a baixa em lote das parcelas
      */
     async processarBaixaTulos(payload) {
         if (!payload.parcelasIds || payload.parcelasIds.length === 0) {
@@ -32,18 +75,19 @@ class CrediarioService {
         }
 
         try {
-            // 🌟 CORRIGIDO: Usa 'request' com o método POST e repassa o payload no body (data)
+            const headers = obterHeadersAutenticados();
+
             const resposta = await request(`/api/crediario/baixar`, {
                 method: 'POST',
-                data: payload
+                headers: headers,
+                body: payload
             });
             
-            return resposta.data || resposta;
+            return resposta;
         } catch (error) {
-            const mensagem = error.response?.data?.erro || error.message || 'Falha crítica ao registrar baixa do crediário.';
-            throw new Error(mensagem);
+            throw new Error(error.message || 'Falha crítica ao registrar baixa do crediário.');
         }
     }
-}
+};
 
-export default new CrediarioService();
+export default CrediarioService;

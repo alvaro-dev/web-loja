@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { useTenantStore } from './tenant';
+import { tenantHeaders } from '@/services/api'; // 🌟 Importado
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -14,7 +15,13 @@ export const useAuthStore = defineStore('auth', {
             this.listaMenus = dadosLogin.menus;
             this.sistemaLiberado = true;
 
-            // Alimenta a store vizinha de Tenant de forma atômica
+            // 🌟 Injeta o ID do operador para o interceptor do api.js
+            if (dadosLogin.usuario?.id) {
+                tenantHeaders.usuarioId = dadosLogin.usuario.id;
+                localStorage.setItem('usuarioId', dadosLogin.usuario.id);
+                localStorage.setItem('user', JSON.stringify(dadosLogin.usuario));
+            }
+
             const tenantStore = useTenantStore();
             tenantStore.setAcessos(dadosLogin.acessos);
         },
@@ -23,6 +30,10 @@ export const useAuthStore = defineStore('auth', {
             this.usuarioLogado = null;
             this.listaMenus = [];
             this.sistemaLiberado = false;
+            
+            tenantHeaders.usuarioId = '';
+            localStorage.removeItem('usuarioId');
+            localStorage.removeItem('user');
 
             const tenantStore = useTenantStore();
             tenantStore.limparTenant();

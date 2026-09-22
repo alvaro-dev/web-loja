@@ -12,7 +12,13 @@ import CrediarioController from './controllers/CrediarioController.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+    origin: '*', // Permite chamadas do seu front-end (porta 5173)
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: '*', // 🌟 CORINGA: Aceita qualquer cabeçalho customizado (evita erros de preflight de uma vez por todas)
+    exposedHeaders: '*',
+    credentials: true
+}));
 app.use(express.json());
 
 // 🚪 ROTAS DE AUTENTICAÇÃO E SESSÃO
