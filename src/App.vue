@@ -1675,7 +1675,8 @@ watch([abaAtiva, empresaAtivaId, filialAtivaId, filtroBuscaCliente], () => {
 });
 
 watch(abaAtiva, (novaAba) => { 
-  if (novaAba === '/configuracoes-escopo') carregarDicionarioEscopos(); 
+  if (novaAba === '/configuracoes-escopo') carregarDicionarioEscopos();
+  if (novaAba === '/clientes') carregarClientes();
 });
 
 watch([abaAtiva, empresaAtivaId, filialAtivaId], () => { 

@@ -1,15 +1,24 @@
+// server/controllers/ClienteController.js
 import ClienteRepository from '../repositories/ClienteRepository.js';
+
+function extrairEmpresaEFilial(req) {
+    const empresaId = req.headers['x-empresa-id'] || req.headers['empresa-id'] || req.headers['x_empresa_id'] || req.headers['empresa_id'];
+    const filialId = req.headers['x-filial-id'] || req.headers['filial-id'] || req.headers['x_filial_id'] || req.headers['filial_id'];
+    return { empresaId, filialId };
+}
 
 class ClienteController {
     async listar(req, res) {
-        const { x_empresa_id } = req.headers;
+        const { empresaId } = extrairEmpresaEFilial(req);
         const { busca } = req.query;
 
-        if (!x_empresa_id) return res.status(400).json({ erro: 'O cabeçalho x_empresa_id é obrigatório.' });
+        if (!empresaId) {
+            return res.status(400).json({ erro: 'O cabeçalho da Empresa ativa é obrigatório.' });
+        }
 
         try {
             const termo = busca ? String(busca).trim() : '';
-            const clientes = await ClienteRepository.listarCompartilhados(x_empresa_id, termo);
+            const clientes = await ClienteRepository.listarCompartilhados(empresaId, termo);
             return res.json(clientes);
         } catch (err) {
             console.error('Erro na listagem:', err.message);
@@ -18,22 +27,21 @@ class ClienteController {
     }
 
     async cadastrar(req, res) {
-        const { x_empresa_id, x_filial_id } = req.headers;
+        const { empresaId, filialId } = extrairEmpresaEFilial(req);
         const { nome, cpf, rg, data_nascimento, telefone, email, cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito, bloqueado, motivo_bloqueio } = req.body;
 
-        if (!x_empresa_id || !nome) return res.status(400).json({ erro: 'Dados obrigatórios ausentes.' });
+        if (!empresaId || !nome) {
+            return res.status(400).json({ erro: 'Dados obrigatórios ausentes (Empresa e Nome do Cliente são necessários).' });
+        }
 
         const cpfClean = cpf ? cpf.replace(/[.\-_]/g, '') : null;
-        
-        // 🌟 ARQUITETURA DE ROBUSTEDADE: Inicializa canal atômico para a transação
         const client = await ClienteRepository.getClient();
 
         try {
-            await client.query('BEGIN'); // 🔒 Bloqueia o estado para esta transação
+            await client.query('BEGIN');
 
             if (cpfClean) {
-                // Passa o client ativo para garantir isolamento do SELECT de validação
-                const existe = await ClienteRepository.buscarPorCpf(x_empresa_id, cpfClean, client);
+                const existe = await ClienteRepository.buscarPorCpf(empresaId, cpfClean, client);
                 if (existe) {
                     await client.query('ROLLBACK');
                     return res.status(400).json({ erro: 'Este CPF já está cadastrado no sistema.' });
@@ -49,24 +57,28 @@ class ClienteController {
                 motivo_bloqueio: bloqueado === 'S' ? motivo_bloqueio : null
             };
 
-            const novoCliente = await ClienteRepository.criar(payload, x_empresa_id, x_filial_id, client);
+            const novoCliente = await ClienteRepository.criar(payload, empresaId, filialId, client);
             
-            await client.query('COMMIT'); // 🔓 Grava definitivamente de forma segura
+            await client.query('COMMIT');
             return res.status(201).json({ mensagem: 'Cliente salvo com sucesso!', cliente: novoCliente });
 
         } catch (err) {
-            await client.query('ROLLBACK'); // 🚨 Desfaz qualquer alteração se houver pane mecânica
+            await client.query('ROLLBACK');
             console.error('Erro ao cadastrar cliente:', err.message);
             return res.status(500).json({ erro: 'Falha interna transacional ao salvar cliente.' });
         } finally {
-            client.release(); // 🔒 DEVOLUÇÃO OBRIGATÓRIA: Evita travamento do Pool
+            client.release();
         }
     }
 
     async atualizar(req, res) {
-        const { x_empresa_id } = req.headers;
+        const { empresaId } = extrairEmpresaEFilial(req);
         const { id } = req.params;
         const { nome, cpf, rg, data_nascimento, telefone, email, cep, logradouro, numero, complemento, bairro, cidade, estado, limite_credito, bloqueado, motivo_bloqueio } = req.body;
+
+        if (!empresaId) {
+            return res.status(400).json({ erro: 'Identificação da Empresa ausente.' });
+        }
 
         const cpfClean = cpf ? cpf.replace(/[.\-_]/g, '') : null;
         const client = await ClienteRepository.getClient();
@@ -75,7 +87,7 @@ class ClienteController {
             await client.query('BEGIN');
 
             if (cpfClean) {
-                const existe = await ClienteRepository.buscarPorCpf(x_empresa_id, cpfClean, client);
+                const existe = await ClienteRepository.buscarPorCpf(empresaId, cpfClean, client);
                 if (existe && existe.id !== id) {
                     await client.query('ROLLBACK');
                     return res.status(400).json({ erro: 'Outro cliente já utiliza este número de CPF.' });
@@ -89,7 +101,7 @@ class ClienteController {
                 limiteFormatado: parseFloat(limite_credito) || 0.00
             };
 
-            await ClienteRepository.atualizar(id, x_empresa_id, dadosAtualizacao, client);
+            await ClienteRepository.atualizar(id, empresaId, dadosAtualizacao, client);
             
             await client.query('COMMIT');
             return res.json({ mensagem: 'Cadastro atualizado com sucesso!' });
@@ -104,10 +116,10 @@ class ClienteController {
     }
 
     async deletar(req, res) {
-        const { x_empresa_id } = req.headers;
+        const { empresaId } = extrairEmpresaEFilial(req);
         const { id } = req.params;
         try {
-            await ClienteRepository.deletarLogico(id, x_empresa_id);
+            await ClienteRepository.deletarLogico(id, empresaId);
             return res.json({ mensagem: 'Cliente removido com sucesso do sistema.' });
         } catch (err) {
             console.error(err);
